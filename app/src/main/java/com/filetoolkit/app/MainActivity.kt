@@ -5,6 +5,10 @@ import android.net.Uri
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.animation.AnimatedContentTransitionScope
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -71,7 +75,31 @@ class MainActivity : ComponentActivity() {
                     NavHost(
                         navController = navController,
                         startDestination = "home",
-                        modifier = Modifier.padding(innerPadding)
+                        modifier = Modifier.padding(innerPadding),
+                        enterTransition = {
+                            fadeIn(animationSpec = tween(200)) + slideIntoContainer(
+                                AnimatedContentTransitionScope.SlideDirection.Start,
+                                animationSpec = tween(200)
+                            )
+                        },
+                        exitTransition = {
+                            fadeOut(animationSpec = tween(200)) + slideOutOfContainer(
+                                AnimatedContentTransitionScope.SlideDirection.Start,
+                                animationSpec = tween(200)
+                            )
+                        },
+                        popEnterTransition = {
+                            fadeIn(animationSpec = tween(200)) + slideIntoContainer(
+                                AnimatedContentTransitionScope.SlideDirection.End,
+                                animationSpec = tween(200)
+                            )
+                        },
+                        popExitTransition = {
+                            fadeOut(animationSpec = tween(200)) + slideOutOfContainer(
+                                AnimatedContentTransitionScope.SlideDirection.End,
+                                animationSpec = tween(200)
+                            )
+                        }
                     ) {
                         // 1. Home Tab
                         composable("home") {
@@ -117,7 +145,8 @@ class MainActivity : ComponentActivity() {
                         composable("recent") {
                             RecentScreen(
                                 historyItems = historyList,
-                                onClearHistory = { historyRepository.clearHistory() }
+                                onClearHistory = { historyRepository.clearHistory() },
+                                onNavigateToTools = { navController.navigate("tools") }
                             )
                         }
 

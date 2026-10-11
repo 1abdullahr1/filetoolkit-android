@@ -6,7 +6,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -20,9 +20,13 @@ import androidx.compose.ui.unit.dp
 import com.filetoolkit.app.data.*
 import com.filetoolkit.app.ui.components.*
 import com.filetoolkit.app.ui.theme.*
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.FileOutputStream
+import java.util.Collections
 
 @Composable
 fun ImageToolScreen(
@@ -38,8 +42,10 @@ fun ImageToolScreen(
     var quality by remember { mutableStateOf(85f) }
     var widthInput by remember { mutableStateOf("1920") }
     var heightInput by remember { mutableStateOf("1080") }
+    var baseRatio by remember { mutableStateOf<Float?>(null) }
     var maintainAspectRatio by remember { mutableStateOf(true) }
     var isProcessing by remember { mutableStateOf(false) }
+    var processingJob by remember { mutableStateOf<Job?>(null) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
 
     fun copyUriToTemp(uri: Uri): File? {
@@ -68,9 +74,10 @@ fun ImageToolScreen(
                 if (tempFile != null) {
                     val info = NativeBridge.inspect(tempFile.absolutePath)
                     selectedFiles = listOf(info)
-                    if (info.width != null && info.height != null) {
+                    if (info.width != null && info.height != null && info.height > 0) {
                         widthInput = info.width.toString()
                         heightInput = info.height.toString()
+                        baseRatio = info.width.toFloat() / info.height.toFloat()
                     }
                 }
             }
@@ -136,12 +143,47 @@ fun ImageToolScreen(
                     )
                 }
             } else {
-                items(selectedFiles) { file ->
+                // Section subtitle
+                item {
+                    Text(
+                        text = "Selected files · ${selectedFiles.size}",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = TextPrimary
+                    )
+                }
+
+                // Live preview card for primary image
+                if (selectedFiles.isNotEmpty()) {
+                    item {
+                        ImagePreviewCard(
+                            filePath = selectedFiles.first().path,
+                            modifier = Modifier.padding(bottom = 6.dp)
+                        )
+                    }
+                }
+
+                // File list with Move Up and Move Down accessible reordering controls
+                itemsIndexed(selectedFiles) { index, file ->
                     SelectedFileItemRow(
                         fileInfo = file,
                         onRemove = {
                             selectedFiles = selectedFiles.filter { it.path != file.path }
-                        }
+                        },
+                        onMoveUp = if (index > 0) {
+                            {
+                                val list = selectedFiles.toMutableList()
+                                Collections.swap(list, index, index - 1)
+                                selectedFiles = list
+                            }
+                        } else null,
+                        onMoveDown = if (index < selectedFiles.size - 1) {
+                            {
+                                val list = selectedFiles.toMutableList()
+                                Collections.swap(list, index, index + 1)
+                                selectedFiles = list
+                            }
+                        } else null
                     )
                 }
 
@@ -175,14 +217,38 @@ fun ImageToolScreen(
                         DarkInputField(
                             label = "Width (px)",
                             value = widthInput,
-                            onValueChange = { widthInput = it },
+                            onValueChange = { newWStr ->
+                                widthInput = newWStr
+                                val newW = newWStr.toIntOrNull()
+                                if (maintainAspectRatio && newW != null && newW > 0) {
+                                    val r = baseRatio ?: (widthInput.toFloatOrNull()?.let { w ->
+                                        heightInput.toFloatOrNull()?.let { h -> if (h > 0) w / h else null }
+                                    } ?: 1f)
+                                    val newH = (newW / r).toInt()
+                                    if (newH > 0 && newH.toString() != heightInput) {
+                                        heightInput = newH.toString()
+                                    }
+                                }
+                            },
                             keyboardType = KeyboardType.Number,
                             modifier = Modifier.weight(1f)
                         )
                         DarkInputField(
                             label = "Height (px)",
                             value = heightInput,
-                            onValueChange = { heightInput = it },
+                            onValueChange = { newHStr ->
+                                heightInput = newHStr
+                                val newH = newHStr.toIntOrNull()
+                                if (maintainAspectRatio && newH != null && newH > 0) {
+                                    val r = baseRatio ?: (widthInput.toFloatOrNull()?.let { w ->
+                                        heightInput.toFloatOrNull()?.let { h -> if (h > 0) w / h else null }
+                                    } ?: 1f)
+                                    val newW = (newH * r).toInt()
+                                    if (newW > 0 && newW.toString() != widthInput) {
+                                        widthInput = newW.toString()
+                                    }
+                                }
+                            },
                             keyboardType = KeyboardType.Number,
                             modifier = Modifier.weight(1f)
                         )
@@ -263,6 +329,40 @@ fun ImageToolScreen(
                 }
             }
 
+            // Live estimated file size indicator
+            val firstFileSize = selectedFiles.firstOrNull()?.sizeBytes ?: 0L
+            if (firstFileSize > 0L) {
+                val factor = when (targetFormat.lowercase()) {
+                    "jpeg", "jpg" -> 0.75f * (quality / 100f)
+                    "webp" -> 0.60f * (quality / 100f)
+                    "png" -> 1.10f
+                    "bmp" -> 2.50f
+                    else -> 1.0f
+                }
+                val estBytes = (firstFileSize * factor).toLong().coerceAtLeast(1024L)
+                item {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 4.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "Estimated size",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = TextSecondary
+                        )
+                        Text(
+                            text = "~${formatFileSize(estBytes)}",
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            color = TextPrimary
+                        )
+                    }
+                }
+            }
+
             // Action Button (Screenshot 3)
             item {
                 Spacer(modifier = Modifier.height(10.dp))
@@ -272,7 +372,7 @@ fun ImageToolScreen(
                     onClick = {
                         isProcessing = true
                         errorMessage = null
-                        scope.launch {
+                        processingJob = scope.launch(Dispatchers.IO) {
                             try {
                                 if (tool.id == "img_to_pdf") {
                                     val outFile = File(context.cacheDir, "doc_${System.currentTimeMillis()}.pdf")
@@ -281,8 +381,10 @@ fun ImageToolScreen(
                                         outputPath = outFile.absolutePath
                                     )
                                     val result = NativeBridge.createPdfFromImages(req)
-                                    isProcessing = false
-                                    onResult(result, tool.title)
+                                    withContext(Dispatchers.Main) {
+                                        isProcessing = false
+                                        onResult(result, tool.title)
+                                    }
                                 } else if (selectedFiles.size > 1) {
                                     val batchItems = selectedFiles.map { file ->
                                         val outFile = File(context.cacheDir, "conv_${System.currentTimeMillis()}_${file.filename}.$targetFormat")
@@ -298,9 +400,11 @@ fun ImageToolScreen(
                                     }
                                     val batchReq = BatchImageRequest(items = batchItems)
                                     val batchRes = NativeBridge.batchConvertImg(batchReq)
-                                    isProcessing = false
                                     val primaryResult = batchRes.items.firstOrNull() ?: OperationResult(false, errorMessage = "Batch failed")
-                                    onResult(primaryResult, tool.title)
+                                    withContext(Dispatchers.Main) {
+                                        isProcessing = false
+                                        onResult(primaryResult, tool.title)
+                                    }
                                 } else {
                                     val single = selectedFiles.first()
                                     val outFile = File(context.cacheDir, "conv_${System.currentTimeMillis()}.$targetFormat")
@@ -314,12 +418,16 @@ fun ImageToolScreen(
                                         keepAspectRatio = maintainAspectRatio
                                     )
                                     val result = NativeBridge.convertImg(req)
-                                    isProcessing = false
-                                    onResult(result, tool.title)
+                                    withContext(Dispatchers.Main) {
+                                        isProcessing = false
+                                        onResult(result, tool.title)
+                                    }
                                 }
                             } catch (e: Exception) {
-                                isProcessing = false
-                                errorMessage = e.message
+                                withContext(Dispatchers.Main) {
+                                    isProcessing = false
+                                    errorMessage = e.message
+                                }
                             }
                         }
                     }
@@ -329,7 +437,13 @@ fun ImageToolScreen(
         }
 
         if (isProcessing) {
-            ProcessingModal(message = "Processing image...")
+            ProcessingModal(
+                message = "Processing image...",
+                onCancel = {
+                    processingJob?.cancel()
+                    isProcessing = false
+                }
+            )
         }
     }
 }

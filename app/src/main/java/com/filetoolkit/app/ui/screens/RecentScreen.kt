@@ -34,7 +34,8 @@ import java.util.Locale
 @Composable
 fun RecentScreen(
     historyItems: List<HistoryItem>,
-    onClearHistory: () -> Unit
+    onClearHistory: () -> Unit,
+    onNavigateToTools: () -> Unit = {}
 ) {
     val context = LocalContext.current
     var selectedFilter by remember { mutableStateOf("All") }
@@ -130,6 +131,17 @@ fun RecentScreen(
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = TextSecondary
                             )
+                            Spacer(modifier = Modifier.height(16.dp))
+                            Button(
+                                onClick = onNavigateToTools,
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = PureWhite,
+                                    contentColor = PureBlack
+                                ),
+                                shape = RoundedCornerShape(8.dp)
+                            ) {
+                                Text("Explore Tools", fontWeight = FontWeight.Bold)
+                            }
                         }
                     }
                 }

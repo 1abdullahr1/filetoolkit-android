@@ -3,25 +3,33 @@ package com.filetoolkit.app.ui.screens
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.PictureAsPdf
+import androidx.compose.material.icons.filled.RestartAlt
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.filetoolkit.app.data.*
 import com.filetoolkit.app.ui.components.*
 import com.filetoolkit.app.ui.theme.*
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.FileOutputStream
+import java.util.Collections
 
 @Composable
 fun PdfToolScreen(
@@ -33,11 +41,13 @@ fun PdfToolScreen(
     val scope = rememberCoroutineScope()
 
     var selectedFiles by remember { mutableStateOf<List<FileInfo>>(emptyList()) }
+    var originalOrder by remember { mutableStateOf<List<FileInfo>>(emptyList()) }
     var pageInput by remember { mutableStateOf("1") }
     var rotationDegrees by remember { mutableStateOf(90) }
     var watermarkText by remember { mutableStateOf("CONFIDENTIAL") }
     var pageNumFormat by remember { mutableStateOf("Page {n} of {total}") }
     var isProcessing by remember { mutableStateOf(false) }
+    var processingJob by remember { mutableStateOf<Job?>(null) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
 
     fun copyUriToTemp(uri: Uri): File? {
@@ -64,6 +74,7 @@ fun PdfToolScreen(
                 if (tempFile != null) {
                     val info = NativeBridge.inspect(tempFile.absolutePath)
                     selectedFiles = listOf(info)
+                    originalOrder = listOf(info)
                 }
             }
         }
@@ -82,6 +93,7 @@ fun PdfToolScreen(
                     }
                 }
                 selectedFiles = list
+                originalOrder = list
             }
         }
     }
@@ -106,20 +118,62 @@ fun PdfToolScreen(
             // Section subtitle matching screenshot 1: "Selected files · 2"
             if (selectedFiles.isNotEmpty()) {
                 item {
-                    Text(
-                        text = "Selected files · ${selectedFiles.size}",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold,
-                        color = TextPrimary
-                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "Selected files · ${selectedFiles.size}",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            color = TextPrimary
+                        )
+                        if (selectedFiles.size > 1 && selectedFiles != originalOrder && originalOrder.isNotEmpty()) {
+                            Row(
+                                modifier = Modifier
+                                    .clickable { selectedFiles = originalOrder.filter { it in selectedFiles } }
+                                    .padding(vertical = 4.dp, horizontal = 6.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.RestartAlt,
+                                    contentDescription = "Reset order",
+                                    tint = TextSecondary,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(
+                                    text = "Reset order",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = TextSecondary
+                                )
+                            }
+                        }
+                    }
                 }
 
-                items(selectedFiles) { file ->
+                itemsIndexed(selectedFiles) { index, file ->
                     SelectedFileItemRow(
                         fileInfo = file,
                         onRemove = {
                             selectedFiles = selectedFiles.filter { it.path != file.path }
-                        }
+                            originalOrder = originalOrder.filter { it.path != file.path }
+                        },
+                        onMoveUp = if (index > 0) {
+                            {
+                                val list = selectedFiles.toMutableList()
+                                Collections.swap(list, index, index - 1)
+                                selectedFiles = list
+                            }
+                        } else null,
+                        onMoveDown = if (index < selectedFiles.size - 1) {
+                            {
+                                val list = selectedFiles.toMutableList()
+                                Collections.swap(list, index, index + 1)
+                                selectedFiles = list
+                            }
+                        } else null
                     )
                 }
             }
@@ -194,7 +248,7 @@ fun PdfToolScreen(
                     onClick = {
                         isProcessing = true
                         errorMessage = null
-                        scope.launch {
+                        processingJob = scope.launch(Dispatchers.IO) {
                             try {
                                 val outFile = File(context.cacheDir, "pdf_out_${System.currentTimeMillis()}.pdf")
                                 val primaryFile = selectedFiles.first()
@@ -262,11 +316,15 @@ fun PdfToolScreen(
                                     else -> OperationResult(false, errorMessage = "Unknown PDF operation")
                                 }
 
-                                isProcessing = false
-                                onResult(result, tool.title)
+                                withContext(Dispatchers.Main) {
+                                    isProcessing = false
+                                    onResult(result, tool.title)
+                                }
                             } catch (e: Exception) {
-                                isProcessing = false
-                                errorMessage = e.message
+                                withContext(Dispatchers.Main) {
+                                    isProcessing = false
+                                    errorMessage = e.message
+                                }
                             }
                         }
                     }
@@ -276,7 +334,13 @@ fun PdfToolScreen(
         }
 
         if (isProcessing) {
-            ProcessingModal(message = "Processing PDF document...")
+            ProcessingModal(
+                message = "Processing PDF document...",
+                onCancel = {
+                    processingJob?.cancel()
+                    isProcessing = false
+                }
+            )
         }
     }
 }

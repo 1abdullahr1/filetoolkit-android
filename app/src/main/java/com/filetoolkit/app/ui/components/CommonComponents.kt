@@ -1,24 +1,34 @@
 package com.filetoolkit.app.ui.components
 
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
@@ -26,6 +36,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.filetoolkit.app.data.FileInfo
 import com.filetoolkit.app.ui.theme.*
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import java.io.File
 import java.text.DecimalFormat
 
 fun formatFileSize(bytes: Long): String {
@@ -55,7 +68,10 @@ fun AppHeader(
         },
         navigationIcon = {
             if (canNavigateBack) {
-                IconButton(onClick = onNavigateBack) {
+                IconButton(
+                    onClick = onNavigateBack,
+                    modifier = Modifier.size(48.dp)
+                ) {
                     Icon(
                         imageVector = Icons.Default.ArrowBack,
                         contentDescription = "Back",
@@ -79,12 +95,22 @@ fun PrimaryActionButton(
     modifier: Modifier = Modifier,
     enabled: Boolean = true
 ) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val isPressed by interactionSource.collectIsPressedAsState()
+    val scale by animateFloatAsState(
+        targetValue = if (isPressed) 0.98f else 1.0f,
+        animationSpec = tween(durationMillis = 100),
+        label = "button_press_scale"
+    )
+
     Button(
         onClick = onClick,
         enabled = enabled,
+        interactionSource = interactionSource,
         modifier = modifier
             .fillMaxWidth()
-            .height(52.dp),
+            .height(52.dp)
+            .scale(scale),
         shape = RoundedCornerShape(10.dp),
         colors = ButtonDefaults.buttonColors(
             containerColor = ActionPrimaryBg,
@@ -153,6 +179,8 @@ fun DashedFilePickerBox(
 @Composable
 fun SelectedFileItemRow(
     fileInfo: FileInfo,
+    onMoveUp: (() -> Unit)? = null,
+    onMoveDown: (() -> Unit)? = null,
     onRemove: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
@@ -170,7 +198,7 @@ fun SelectedFileItemRow(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Icon(
-                imageVector = Icons.Default.Description,
+                imageVector = if (fileInfo.format == "PDF") Icons.Default.PictureAsPdf else Icons.Default.Description,
                 contentDescription = null,
                 tint = TextPrimary,
                 modifier = Modifier.size(26.dp)
@@ -199,23 +227,103 @@ fun SelectedFileItemRow(
                     color = TextSecondary
                 )
             }
-            Icon(
-                imageVector = Icons.Default.DragHandle,
-                contentDescription = null,
-                tint = TextMuted,
-                modifier = Modifier.size(20.dp)
-            )
+
+            // Reorder controls (Section 3 of d.md)
+            if (onMoveUp != null) {
+                IconButton(
+                    onClick = onMoveUp,
+                    modifier = Modifier.size(36.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.KeyboardArrowUp,
+                        contentDescription = "Move up",
+                        tint = TextSecondary,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+            }
+            if (onMoveDown != null) {
+                IconButton(
+                    onClick = onMoveDown,
+                    modifier = Modifier.size(36.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.KeyboardArrowDown,
+                        contentDescription = "Move down",
+                        tint = TextSecondary,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+            }
+
             if (onRemove != null) {
-                Spacer(modifier = Modifier.width(10.dp))
                 IconButton(
                     onClick = onRemove,
-                    modifier = Modifier.size(24.dp)
+                    modifier = Modifier.size(36.dp)
                 ) {
                     Icon(
                         imageVector = Icons.Default.Close,
                         contentDescription = "Remove",
                         tint = TextSecondary,
                         modifier = Modifier.size(18.dp)
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun ImagePreviewCard(
+    filePath: String,
+    modifier: Modifier = Modifier
+) {
+    var bitmap by remember(filePath) { mutableStateOf<Bitmap?>(null) }
+
+    LaunchedEffect(filePath) {
+        withContext(Dispatchers.IO) {
+            try {
+                val file = File(filePath)
+                if (file.exists()) {
+                    val opts = BitmapFactory.Options().apply {
+                        inSampleSize = 2 // sample down to keep preview lightweight and bounded
+                    }
+                    bitmap = BitmapFactory.decodeFile(file.absolutePath, opts)
+                }
+            } catch (_: Exception) {
+                bitmap = null
+            }
+        }
+    }
+
+    if (bitmap != null) {
+        Card(
+            modifier = modifier
+                .fillMaxWidth()
+                .border(1.dp, BorderSubtle, RoundedCornerShape(12.dp)),
+            shape = RoundedCornerShape(12.dp),
+            colors = CardDefaults.cardColors(containerColor = SurfaceCharcoal)
+        ) {
+            Column(modifier = Modifier.padding(12.dp)) {
+                Text(
+                    text = "Preview",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = TextSecondary,
+                    modifier = Modifier.padding(bottom = 8.dp)
+                )
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(180.dp)
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(SurfaceInput),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Image(
+                        bitmap = bitmap!!.asImageBitmap(),
+                        contentDescription = "Live preview",
+                        contentScale = ContentScale.Fit,
+                        modifier = Modifier.fillMaxSize()
                     )
                 }
             }
@@ -295,10 +403,19 @@ fun FormatChipSelector(
 }
 
 @Composable
-fun ProcessingModal(message: String = "Processing...") {
+fun ProcessingModal(
+    message: String = "Processing...",
+    onCancel: (() -> Unit)? = null
+) {
     AlertDialog(
         onDismissRequest = {},
-        confirmButton = {},
+        confirmButton = {
+            if (onCancel != null) {
+                TextButton(onClick = onCancel) {
+                    Text("Cancel", color = StateError)
+                }
+            }
+        },
         shape = RoundedCornerShape(12.dp),
         containerColor = SurfaceCharcoal,
         text = {
