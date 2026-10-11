@@ -1,325 +1,272 @@
 package com.filetoolkit.app.ui.screens
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.filetoolkit.app.data.*
-import com.filetoolkit.app.ui.components.FormatBadge
-import com.filetoolkit.app.ui.components.formatFileSize
+import com.filetoolkit.app.data.ToolCategory
+import com.filetoolkit.app.ui.theme.*
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
-    historyItems: List<HistoryItem>,
-    onSelectTool: (ToolDefinition) -> Unit,
-    onOpenHistory: () -> Unit,
-    onOpenFormatMatrix: () -> Unit
+    onSelectQuickAction: (String) -> Unit,
+    onSelectCategory: (ToolCategory) -> Unit,
+    onSearchClick: () -> Unit,
+    onHistoryClick: () -> Unit
 ) {
-    var searchQuery by remember { mutableStateOf("") }
-    var selectedCategory by remember { mutableStateOf<ToolCategory?>(null) }
-    var coreVersion by remember { mutableStateOf("Checking...") }
-
-    LaunchedEffect(Unit) {
-        coreVersion = NativeBridge.getVersion()
-    }
-
-    val filteredTools = remember(searchQuery, selectedCategory) {
-        var tools = if (searchQuery.isNotEmpty()) {
-            ToolRepository.searchTools(searchQuery)
-        } else {
-            ToolRepository.allTools
-        }
-        if (selectedCategory != null) {
-            tools = tools.filter { it.category == selectedCategory }
-        }
-        tools
-    }
-
     Scaffold(
+        containerColor = PureBlack,
         topBar = {
             TopAppBar(
                 title = {
-                    Column {
-                        Text(
-                            text = "FileToolkit",
-                            style = MaterialTheme.typography.titleLarge,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Text(
-                            text = "Offline Native Converter & PDF Suite",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                },
-                actions = {
-                    IconButton(onClick = onOpenFormatMatrix) {
-                        Icon(
-                            imageVector = Icons.Default.Info,
-                            contentDescription = "Format Capabilities"
-                        )
-                    }
-                    IconButton(onClick = onOpenHistory) {
-                        Icon(
-                            imageVector = Icons.Default.History,
-                            contentDescription = "History"
-                        )
-                    }
-                }
-            )
-        }
-    ) { paddingValues ->
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
-                .padding(horizontal = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            // Engine status banner
-            item {
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp),
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f)
-                    )
-                ) {
                     Row(
-                        modifier = Modifier.padding(12.dp),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
                         Icon(
-                            imageVector = Icons.Default.Memory,
+                            imageVector = Icons.Default.FilterNone,
                             contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary
+                            tint = TextPrimary,
+                            modifier = Modifier.size(24.dp)
                         )
-                        Column {
-                            Text(
-                                text = "Rust Native Engine 1.0",
-                                style = MaterialTheme.typography.labelLarge,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onPrimaryContainer
-                            )
-                            Text(
-                                text = "Offline-first processing: JNI memory bounded",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
-                            )
-                        }
+                        Text(
+                            text = "FileKit",
+                            style = MaterialTheme.typography.headlineMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = TextPrimary
+                        )
                     }
-                }
-            }
-
-            // Search bar
-            item {
-                OutlinedTextField(
-                    value = searchQuery,
-                    onValueChange = { searchQuery = it },
-                    modifier = Modifier.fillMaxWidth(),
-                    placeholder = { Text("Search tools (e.g. JPG to PNG, Merge PDF)") },
-                    leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
-                    trailingIcon = {
-                        if (searchQuery.isNotEmpty()) {
-                            IconButton(onClick = { searchQuery = "" }) {
-                                Icon(Icons.Default.Clear, contentDescription = "Clear")
-                            }
-                        }
-                    },
-                    shape = RoundedCornerShape(12.dp),
-                    singleLine = true
+                },
+                actions = {
+                    IconButton(onClick = onSearchClick) {
+                        Icon(
+                            imageVector = Icons.Default.Search,
+                            contentDescription = "Search",
+                            tint = TextPrimary
+                        )
+                    }
+                    IconButton(onClick = onHistoryClick) {
+                        Icon(
+                            imageVector = Icons.Default.History,
+                            contentDescription = "Recent",
+                            tint = TextPrimary
+                        )
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = PureBlack,
+                    titleContentColor = TextPrimary
                 )
-            }
-
-            // Category filter chips
+            )
+        }
+    ) { padding ->
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .padding(horizontal = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(20.dp)
+        ) {
+            // Hero Card: QUICK ACTIONS
             item {
-                LazyRow(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .border(1.dp, BorderSubtle, RoundedCornerShape(14.dp)),
+                    shape = RoundedCornerShape(14.dp),
+                    colors = CardDefaults.cardColors(containerColor = DarkBackground)
                 ) {
-                    item {
-                        FilterChip(
-                            selected = selectedCategory == null,
-                            onClick = { selectedCategory = null },
-                            label = { Text("All Tools") }
-                        )
-                    }
-                    items(ToolCategory.values().filter { it != ToolCategory.HISTORY }) { cat ->
-                        FilterChip(
-                            selected = selectedCategory == cat,
-                            onClick = { selectedCategory = if (selectedCategory == cat) null else cat },
-                            label = { Text(cat.name.lowercase().capitalize()) }
-                        )
-                    }
-                }
-            }
-
-            // Section: Tools list
-            item {
-                Text(
-                    text = if (selectedCategory == null) "All Operations (${filteredTools.size})" else "${selectedCategory?.name} (${filteredTools.size})",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold
-                )
-            }
-
-            items(filteredTools) { tool ->
-                ToolCard(tool = tool, onClick = { onSelectTool(tool) })
-            }
-
-            // Recent operations section
-            if (historyItems.isNotEmpty()) {
-                item {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
+                    Column(
+                        modifier = Modifier.padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(14.dp)
                     ) {
                         Text(
-                            text = "Recent Operations",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold
+                            text = "QUICK ACTIONS",
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            color = TextSecondary,
+                            letterSpacing = 1.sp
                         )
-                        TextButton(onClick = onOpenHistory) {
-                            Text("View All")
+
+                        Text(
+                            text = "What do you want to do?",
+                            style = MaterialTheme.typography.headlineMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = TextPrimary
+                        )
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            QuickActionItem(
+                                title = "Convert",
+                                icon = Icons.Default.SwapHoriz,
+                                onClick = { onSelectQuickAction("img_convert") },
+                                modifier = Modifier.weight(1f)
+                            )
+                            QuickActionItem(
+                                title = "Merge PDF",
+                                icon = Icons.Default.FileCopy,
+                                onClick = { onSelectQuickAction("pdf_merge") },
+                                modifier = Modifier.weight(1f)
+                            )
+                            QuickActionItem(
+                                title = "Split PDF",
+                                icon = Icons.Default.ContentCut,
+                                onClick = { onSelectQuickAction("pdf_split") },
+                                modifier = Modifier.weight(1f)
+                            )
                         }
                     }
                 }
+            }
 
-                items(historyItems.take(3)) { item ->
-                    RecentOperationCard(item = item)
+            // Section: All tools
+            item {
+                Text(
+                    text = "All tools",
+                    style = MaterialTheme.typography.headlineMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = TextPrimary
+                )
+            }
+
+            // 2x2 Grid for Tool Categories
+            item {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        CategoryGridCard(
+                            title = "Image tools",
+                            icon = Icons.Default.Image,
+                            onClick = { onSelectCategory(ToolCategory.IMAGES) },
+                            modifier = Modifier.weight(1f)
+                        )
+                        CategoryGridCard(
+                            title = "Document tools",
+                            icon = Icons.Default.Description,
+                            onClick = { onSelectCategory(ToolCategory.DOCUMENTS) },
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        CategoryGridCard(
+                            title = "PDF tools",
+                            icon = Icons.Default.Article,
+                            onClick = { onSelectCategory(ToolCategory.PDF) },
+                            modifier = Modifier.weight(1f)
+                        )
+                        CategoryGridCard(
+                            title = "Text tools",
+                            icon = Icons.Default.Title,
+                            onClick = { onSelectCategory(ToolCategory.TEXT) },
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
                 }
             }
 
             item {
-                Spacer(modifier = Modifier.height(24.dp))
+                Spacer(modifier = Modifier.height(32.dp))
             }
         }
     }
 }
 
 @Composable
-fun ToolCard(tool: ToolDefinition, onClick: () -> Unit) {
+fun QuickActionItem(
+    title: String,
+    icon: ImageVector,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
     Card(
-        modifier = Modifier
-            .fillMaxWidth()
+        modifier = modifier
+            .height(90.dp)
+            .border(1.dp, BorderSubtle, RoundedCornerShape(10.dp))
+            .clickable(onClick = onClick),
+        shape = RoundedCornerShape(10.dp),
+        colors = CardDefaults.cardColors(containerColor = SurfaceCharcoal)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(8.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = TextPrimary,
+                modifier = Modifier.size(24.dp)
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = TextPrimary,
+                fontSize = 14.sp
+            )
+        }
+    }
+}
+
+@Composable
+fun CategoryGridCard(
+    title: String,
+    icon: ImageVector,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Card(
+        modifier = modifier
+            .height(115.dp)
+            .border(1.dp, BorderSubtle, RoundedCornerShape(12.dp))
             .clickable(onClick = onClick),
         shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface
-        ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+        colors = CardDefaults.cardColors(containerColor = SurfaceCharcoal)
     ) {
-        Row(
-            modifier = Modifier.padding(14.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            val icon = when (tool.iconName) {
-                "picture_as_pdf" -> Icons.Default.PictureAsPdf
-                "merge" -> Icons.Default.CallMerge
-                "call_split" -> Icons.Default.CallSplit
-                "content_copy" -> Icons.Default.ContentCopy
-                "rotate_right" -> Icons.Default.RotateRight
-                "delete_sweep" -> Icons.Default.DeleteSweep
-                "branding_watermark" -> Icons.Default.BrandingWatermark
-                "format_list_numbered" -> Icons.Default.FormatListNumbered
-                "archive" -> Icons.Default.Archive
-                "crop" -> Icons.Default.Crop
-                "compress" -> Icons.Default.Compress
-                "collections" -> Icons.Default.Collections
-                "text_snippet" -> Icons.Default.TextSnippet
-                else -> Icons.Default.Image
-            }
-
-            Box(
-                modifier = Modifier
-                    .size(44.dp)
-                    .clip(RoundedCornerShape(10.dp))
-                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = icon,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary
-                )
-            }
-
-            Spacer(modifier = Modifier.width(14.dp))
-
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = tool.title,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold
-                )
-                Text(
-                    text = tool.description,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis
-                )
-            }
-
-            Icon(
-                imageVector = Icons.Default.ChevronRight,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
-            )
-        }
-    }
-}
-
-@Composable
-fun RecentOperationCard(item: HistoryItem) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(10.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
-        )
-    ) {
-        Row(
-            modifier = Modifier.padding(12.dp),
-            verticalAlignment = Alignment.CenterVertically
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(16.dp),
+            verticalArrangement = Arrangement.SpaceBetween
         ) {
             Icon(
-                imageVector = if (item.isSuccess) Icons.Default.CheckCircle else Icons.Default.Error,
+                imageVector = icon,
                 contentDescription = null,
-                tint = if (item.isSuccess) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error
+                tint = TextPrimary,
+                modifier = Modifier.size(28.dp)
             )
-            Spacer(modifier = Modifier.width(10.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = "${item.toolTitle}: ${item.outputFileName}",
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = FontWeight.Medium,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                Text(
-                    text = "${formatFileSize(item.inputSize)} → ${formatFileSize(item.outputSize)}",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = TextPrimary
+            )
         }
     }
 }

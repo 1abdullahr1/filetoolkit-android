@@ -6,23 +6,23 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.PictureAsPdf
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.filetoolkit.app.data.*
 import com.filetoolkit.app.ui.components.*
+import com.filetoolkit.app.ui.theme.*
 import kotlinx.coroutines.launch
 import java.io.File
 import java.io.FileOutputStream
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PdfToolScreen(
     tool: ToolDefinition,
@@ -74,7 +74,7 @@ fun PdfToolScreen(
     ) { uris ->
         if (uris.isNotEmpty()) {
             scope.launch {
-                val list = mutableListOf<FileInfo>()
+                val list = selectedFiles.toMutableList()
                 for (uri in uris) {
                     val tempFile = copyUriToTemp(uri)
                     if (tempFile != null) {
@@ -87,8 +87,9 @@ fun PdfToolScreen(
     }
 
     Scaffold(
+        containerColor = PureBlack,
         topBar = {
-            ToolkitTopBar(
+            AppHeader(
                 title = tool.title,
                 canNavigateBack = true,
                 onNavigateBack = onNavigateBack
@@ -99,242 +100,183 @@ fun PdfToolScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .padding(16.dp),
+                .padding(horizontal = 16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // Picker Card
-            item {
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp)
-                ) {
-                    Column(
-                        modifier = Modifier.padding(16.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.PictureAsPdf,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(48.dp)
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text(
-                            text = if (tool.acceptsMultiple) "Select Multiple PDF Files" else "Select PDF File",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.SemiBold
-                        )
-                        Spacer(modifier = Modifier.height(12.dp))
-                        Button(
-                            onClick = {
-                                if (tool.acceptsMultiple) {
-                                    multiplePickerLauncher.launch("application/pdf")
-                                } else {
-                                    singlePickerLauncher.launch("application/pdf")
-                                }
-                            }
-                        ) {
-                            Text(if (selectedFiles.isEmpty()) "Browse PDF" else "Change File")
-                        }
-                    }
-                }
-            }
-
-            // Display selected files
+            // Section subtitle matching screenshot 1: "Selected files · 2"
             if (selectedFiles.isNotEmpty()) {
                 item {
-                    SectionHeader(title = "Selected Files (${selectedFiles.size})")
-                }
-                items(selectedFiles) { fileInfo ->
-                    FileDisplayCard(
-                        fileInfo = fileInfo,
-                        onRemove = {
-                            selectedFiles = selectedFiles.filter { it.path != fileInfo.path }
-                        }
+                    Text(
+                        text = "Selected files · ${selectedFiles.size}",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = TextPrimary
                     )
                 }
 
-                // Tool-specific options
-                item {
-                    Card(
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(12.dp)
-                    ) {
-                        Column(
-                            modifier = Modifier.padding(16.dp),
-                            verticalArrangement = Arrangement.spacedBy(12.dp)
-                        ) {
-                            Text(
-                                text = "Operation Options",
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold
-                            )
+                items(selectedFiles) { file ->
+                    SelectedFileItemRow(
+                        fileInfo = file,
+                        onRemove = {
+                            selectedFiles = selectedFiles.filter { it.path != file.path }
+                        }
+                    )
+                }
+            }
 
-                            when (tool.id) {
-                                "pdf_extract", "pdf_delete_pages" -> {
-                                    OutlinedTextField(
-                                        value = pageInput,
-                                        onValueChange = { pageInput = it },
-                                        label = { Text("Page numbers (comma separated, e.g. 1, 3, 5)") },
-                                        modifier = Modifier.fillMaxWidth()
-                                    )
-                                }
-                                "pdf_rotate" -> {
-                                    Column {
-                                        Text("Rotation Angle", style = MaterialTheme.typography.labelLarge)
-                                        Spacer(modifier = Modifier.height(6.dp))
-                                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                            listOf(90, 180, 270).forEach { deg ->
-                                                FilterChip(
-                                                    selected = rotationDegrees == deg,
-                                                    onClick = { rotationDegrees = deg },
-                                                    label = { Text("$deg°") }
-                                                )
-                                            }
-                                        }
-                                    }
-                                }
-                                "pdf_watermark" -> {
-                                    OutlinedTextField(
-                                        value = watermarkText,
-                                        onValueChange = { watermarkText = it },
-                                        label = { Text("Watermark text") },
-                                        modifier = Modifier.fillMaxWidth()
-                                    )
-                                }
-                                "pdf_page_numbers" -> {
-                                    OutlinedTextField(
-                                        value = pageNumFormat,
-                                        onValueChange = { pageNumFormat = it },
-                                        label = { Text("Footer format") },
-                                        placeholder = { Text("Page {n} of {total}") },
-                                        modifier = Modifier.fillMaxWidth()
-                                    )
-                                }
-                                "pdf_merge" -> {
-                                    Text(
-                                        text = "Files will be merged in the order listed above.",
-                                        style = MaterialTheme.typography.bodyMedium
-                                    )
-                                }
-                                "pdf_compress" -> {
-                                    Text(
-                                        text = "Streams will be re-encoded with Flate compression and orphaned objects pruned.",
-                                        style = MaterialTheme.typography.bodyMedium
-                                    )
-                                }
-                            }
+            // Dashed Add files Box matching screenshot 1
+            item {
+                DashedFilePickerBox(
+                    title = if (selectedFiles.isEmpty()) "Select PDF" else "Add files",
+                    icon = if (selectedFiles.isEmpty()) Icons.Default.PictureAsPdf else Icons.Default.Add,
+                    onClick = {
+                        if (tool.acceptsMultiple) {
+                            multiplePickerLauncher.launch("application/pdf")
+                        } else {
+                            singlePickerLauncher.launch("application/pdf")
                         }
                     }
-                }
+                )
+            }
 
-                // Process Button
-                item {
-                    Button(
-                        onClick = {
-                            isProcessing = true
-                            errorMessage = null
-                            scope.launch {
-                                try {
-                                    val outFile = File(context.cacheDir, "pdf_out_${System.currentTimeMillis()}.pdf")
-                                    val primaryFile = selectedFiles.first()
-
-                                    val result = when (tool.id) {
-                                        "pdf_merge" -> {
-                                            val req = PdfMergeRequest(
-                                                inputPaths = selectedFiles.map { it.path },
-                                                outputPath = outFile.absolutePath
-                                            )
-                                            NativeBridge.merge(req)
-                                        }
-                                        "pdf_extract" -> {
-                                            val pages = pageInput.split(",")
-                                                .mapNotNull { it.trim().toIntOrNull() }
-                                                .filter { it > 0 }
-                                            val req = PdfExtractPagesRequest(
-                                                inputPath = primaryFile.path,
-                                                outputPath = outFile.absolutePath,
-                                                pageNumbers = pages
-                                            )
-                                            NativeBridge.extractPages(req)
-                                        }
-                                        "pdf_rotate" -> {
-                                            val req = PdfRotatePagesRequest(
-                                                inputPath = primaryFile.path,
-                                                outputPath = outFile.absolutePath,
-                                                rotationDegrees = rotationDegrees
-                                            )
-                                            NativeBridge.rotatePages(req)
-                                        }
-                                        "pdf_delete_pages" -> {
-                                            val pages = pageInput.split(",")
-                                                .mapNotNull { it.trim().toIntOrNull() }
-                                                .filter { it > 0 }
-                                            val req = PdfDeletePagesRequest(
-                                                inputPath = primaryFile.path,
-                                                outputPath = outFile.absolutePath,
-                                                pageNumbers = pages
-                                            )
-                                            NativeBridge.deletePages(req)
-                                        }
-                                        "pdf_watermark" -> {
-                                            val req = PdfWatermarkRequest(
-                                                inputPath = primaryFile.path,
-                                                outputPath = outFile.absolutePath,
-                                                watermarkText = watermarkText
-                                            )
-                                            NativeBridge.watermark(req)
-                                        }
-                                        "pdf_page_numbers" -> {
-                                            val req = PdfPageNumberRequest(
-                                                inputPath = primaryFile.path,
-                                                outputPath = outFile.absolutePath,
-                                                format = pageNumFormat
-                                            )
-                                            NativeBridge.addNumbers(req)
-                                        }
-                                        "pdf_compress" -> {
-                                            NativeBridge.compressPdfFile(
-                                                primaryFile.path,
-                                                outFile.absolutePath
-                                            )
-                                        }
-                                        else -> OperationResult(false, errorMessage = "Unknown PDF operation")
-                                    }
-
-                                    isProcessing = false
-                                    onResult(result, tool.title)
-                                } catch (e: Exception) {
-                                    isProcessing = false
-                                    errorMessage = e.message
+            // Operation-specific options
+            if (selectedFiles.isNotEmpty()) {
+                when (tool.id) {
+                    "pdf_extract", "pdf_delete_pages" -> {
+                        item {
+                            DarkInputField(
+                                label = "Page numbers (comma-separated, e.g. 1, 3, 5)",
+                                value = pageInput,
+                                onValueChange = { pageInput = it }
+                            )
+                        }
+                    }
+                    "pdf_rotate" -> {
+                        item {
+                            Text("Rotation angle", style = MaterialTheme.typography.bodySmall, color = TextSecondary)
+                            Spacer(modifier = Modifier.height(6.dp))
+                            FormatChipSelector(
+                                options = listOf("90°", "180°", "270°"),
+                                selectedOption = "$rotationDegrees°",
+                                onOptionSelected = {
+                                    rotationDegrees = it.replace("°", "").toIntOrNull() ?: 90
                                 }
-                            }
-                        },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(52.dp),
-                        shape = RoundedCornerShape(12.dp)
-                    ) {
-                        Icon(Icons.Default.PlayArrow, contentDescription = null)
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("Process Document", style = MaterialTheme.typography.titleMedium)
+                            )
+                        }
+                    }
+                    "pdf_watermark" -> {
+                        item {
+                            DarkInputField(
+                                label = "Watermark text",
+                                value = watermarkText,
+                                onValueChange = { watermarkText = it }
+                            )
+                        }
+                    }
+                    "pdf_page_numbers" -> {
+                        item {
+                            DarkInputField(
+                                label = "Footer format",
+                                value = pageNumFormat,
+                                onValueChange = { pageNumFormat = it }
+                            )
+                        }
                     }
                 }
             }
 
-            if (errorMessage != null) {
-                item {
-                    Text(
-                        text = "Error: $errorMessage",
-                        color = MaterialTheme.colorScheme.error,
-                        style = MaterialTheme.typography.bodyMedium
-                    )
-                }
+            // Action Button matching screenshot 1
+            item {
+                Spacer(modifier = Modifier.height(10.dp))
+                PrimaryActionButton(
+                    text = tool.title,
+                    enabled = selectedFiles.isNotEmpty(),
+                    onClick = {
+                        isProcessing = true
+                        errorMessage = null
+                        scope.launch {
+                            try {
+                                val outFile = File(context.cacheDir, "pdf_out_${System.currentTimeMillis()}.pdf")
+                                val primaryFile = selectedFiles.first()
+
+                                val result = when (tool.id) {
+                                    "pdf_merge" -> {
+                                        val req = PdfMergeRequest(
+                                            inputPaths = selectedFiles.map { it.path },
+                                            outputPath = outFile.absolutePath
+                                        )
+                                        NativeBridge.merge(req)
+                                    }
+                                    "pdf_extract" -> {
+                                        val pages = pageInput.split(",")
+                                            .mapNotNull { it.trim().toIntOrNull() }
+                                            .filter { it > 0 }
+                                        val req = PdfExtractPagesRequest(
+                                            inputPath = primaryFile.path,
+                                            outputPath = outFile.absolutePath,
+                                            pageNumbers = pages
+                                        )
+                                        NativeBridge.extractPages(req)
+                                    }
+                                    "pdf_rotate" -> {
+                                        val req = PdfRotatePagesRequest(
+                                            inputPath = primaryFile.path,
+                                            outputPath = outFile.absolutePath,
+                                            rotationDegrees = rotationDegrees
+                                        )
+                                        NativeBridge.rotatePages(req)
+                                    }
+                                    "pdf_delete_pages" -> {
+                                        val pages = pageInput.split(",")
+                                            .mapNotNull { it.trim().toIntOrNull() }
+                                            .filter { it > 0 }
+                                        val req = PdfDeletePagesRequest(
+                                            inputPath = primaryFile.path,
+                                            outputPath = outFile.absolutePath,
+                                            pageNumbers = pages
+                                        )
+                                        NativeBridge.deletePages(req)
+                                    }
+                                    "pdf_watermark" -> {
+                                        val req = PdfWatermarkRequest(
+                                            inputPath = primaryFile.path,
+                                            outputPath = outFile.absolutePath,
+                                            watermarkText = watermarkText
+                                        )
+                                        NativeBridge.watermark(req)
+                                    }
+                                    "pdf_page_numbers" -> {
+                                        val req = PdfPageNumberRequest(
+                                            inputPath = primaryFile.path,
+                                            outputPath = outFile.absolutePath,
+                                            format = pageNumFormat
+                                        )
+                                        NativeBridge.addNumbers(req)
+                                    }
+                                    "pdf_compress" -> {
+                                        NativeBridge.compressPdfFile(
+                                            primaryFile.path,
+                                            outFile.absolutePath
+                                        )
+                                    }
+                                    else -> OperationResult(false, errorMessage = "Unknown PDF operation")
+                                }
+
+                                isProcessing = false
+                                onResult(result, tool.title)
+                            } catch (e: Exception) {
+                                isProcessing = false
+                                errorMessage = e.message
+                            }
+                        }
+                    }
+                )
+                Spacer(modifier = Modifier.height(30.dp))
             }
         }
 
         if (isProcessing) {
-            ProcessingDialog(message = "Executing PDF manipulation via Rust lopdf...")
+            ProcessingModal(message = "Processing PDF document...")
         }
     }
 }

@@ -5,29 +5,29 @@ import android.net.Uri
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Error
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.core.content.FileProvider
 import com.filetoolkit.app.data.OperationResult
-import com.filetoolkit.app.ui.components.ToolkitTopBar
+import com.filetoolkit.app.ui.components.AppHeader
+import com.filetoolkit.app.ui.components.PrimaryActionButton
 import com.filetoolkit.app.ui.components.formatFileSize
+import com.filetoolkit.app.ui.theme.*
 import java.io.File
 import java.io.FileInputStream
-import java.io.FileOutputStream
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ResultsScreen(
     result: OperationResult,
@@ -54,7 +54,7 @@ fun ResultsScreen(
                         inStream.copyTo(outStream)
                     }
                 }
-                Toast.makeText(context, "Saved successfully!", Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, "Saved successfully", Toast.LENGTH_SHORT).show()
             } catch (e: Exception) {
                 Toast.makeText(context, "Save failed: ${e.message}", Toast.LENGTH_LONG).show()
             }
@@ -74,9 +74,9 @@ fun ResultsScreen(
                 putExtra(Intent.EXTRA_STREAM, contentUri)
                 addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
             }
-            context.startActivity(Intent.createChooser(shareIntent, "Share generated file"))
+            context.startActivity(Intent.createChooser(shareIntent, "Share file"))
         } catch (e: Exception) {
-            Toast.makeText(context, "Share error: ${e.message}", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, "Share error", Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -102,9 +102,10 @@ fun ResultsScreen(
     }
 
     Scaffold(
+        containerColor = PureBlack,
         topBar = {
-            ToolkitTopBar(
-                title = "Result: $toolTitle",
+            AppHeader(
+                title = toolTitle,
                 canNavigateBack = true,
                 onNavigateBack = onNavigateHome
             )
@@ -114,20 +115,17 @@ fun ResultsScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
+                .padding(horizontal = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
+            // Status Card
             item {
                 Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(16.dp),
-                    colors = CardDefaults.cardColors(
-                        containerColor = if (result.success)
-                            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f)
-                        else
-                            MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.4f)
-                    )
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .border(1.dp, BorderSubtle, RoundedCornerShape(12.dp)),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = CardDefaults.cardColors(containerColor = SurfaceCharcoal)
                 ) {
                     Column(
                         modifier = Modifier
@@ -138,21 +136,22 @@ fun ResultsScreen(
                         Icon(
                             imageVector = if (result.success) Icons.Default.CheckCircle else Icons.Default.Error,
                             contentDescription = null,
-                            tint = if (result.success) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
-                            modifier = Modifier.size(56.dp)
+                            tint = if (result.success) TextPrimary else StateError,
+                            modifier = Modifier.size(48.dp)
                         )
-                        Spacer(modifier = Modifier.height(12.dp))
+                        Spacer(modifier = Modifier.height(10.dp))
                         Text(
-                            text = if (result.success) "Operation Completed" else "Operation Failed",
-                            style = MaterialTheme.typography.titleLarge,
-                            fontWeight = FontWeight.Bold
+                            text = if (result.success) "Operation completed" else "Operation failed",
+                            style = MaterialTheme.typography.headlineMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = TextPrimary
                         )
                         if (!result.success) {
-                            Spacer(modifier = Modifier.height(8.dp))
+                            Spacer(modifier = Modifier.height(6.dp))
                             Text(
-                                text = result.errorMessage ?: "Unknown error occurred during processing",
+                                text = result.errorMessage ?: "Unknown error occurred",
                                 style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.error
+                                color = StateError
                             )
                         }
                     }
@@ -160,57 +159,40 @@ fun ResultsScreen(
             }
 
             if (result.success && outputFile != null) {
-                // File summary card
+                // File info card
                 item {
                     Card(
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(12.dp)
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .border(1.dp, BorderSubtle, RoundedCornerShape(12.dp)),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = CardDefaults.cardColors(containerColor = SurfaceCharcoal)
                     ) {
                         Column(
                             modifier = Modifier.padding(16.dp),
                             verticalArrangement = Arrangement.spacedBy(10.dp)
                         ) {
-                            Text(
-                                text = "File Summary",
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold
-                            )
-
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.SpaceBetween
                             ) {
-                                Text("Generated file:", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                Text(outputFile.name, fontWeight = FontWeight.Medium)
+                                Text("File", style = MaterialTheme.typography.bodyMedium, color = TextSecondary)
+                                Text(outputFile.name, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold, color = TextPrimary)
                             }
-
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.SpaceBetween
                             ) {
-                                Text("Output file size:", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                Text(formatFileSize(result.outputSizeBytes), fontWeight = FontWeight.Bold)
+                                Text("Output size", style = MaterialTheme.typography.bodyMedium, color = TextSecondary)
+                                Text(formatFileSize(result.outputSizeBytes), style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold, color = TextPrimary)
                             }
-
                             if (result.inputSizeBytes > 0) {
                                 Row(
                                     modifier = Modifier.fillMaxWidth(),
                                     horizontalArrangement = Arrangement.SpaceBetween
                                 ) {
-                                    Text("Input file size:", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                    Text(formatFileSize(result.inputSizeBytes))
-                                }
-
-                                val diff = result.outputSizeBytes - result.inputSizeBytes
-                                val pct = (diff.toDouble() / result.inputSizeBytes.toDouble() * 100).toInt()
-                                val diffLabel = if (diff <= 0) "$pct% (Compressed)" else "+$pct%"
-
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween
-                                ) {
-                                    Text("Size change:", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                    Text(diffLabel, fontWeight = FontWeight.Bold, color = if (diff <= 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface)
+                                    Text("Input size", style = MaterialTheme.typography.bodyMedium, color = TextSecondary)
+                                    Text(formatFileSize(result.inputSizeBytes), style = MaterialTheme.typography.bodyMedium, color = TextSecondary)
                                 }
                             }
                         }
@@ -219,46 +201,34 @@ fun ResultsScreen(
 
                 // Action buttons
                 item {
-                    Column(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        Button(
-                            onClick = {
-                                saveFileLauncher.launch(outputFile.name)
-                            },
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(50.dp),
-                            shape = RoundedCornerShape(12.dp)
-                        ) {
-                            Icon(Icons.Default.Save, contentDescription = null)
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text("Save to Device (SAF)")
-                        }
+                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        PrimaryActionButton(
+                            text = "Save to device",
+                            onClick = { saveFileLauncher.launch(outputFile.name) }
+                        )
 
                         OutlinedButton(
                             onClick = { shareFile() },
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .height(50.dp),
-                            shape = RoundedCornerShape(12.dp)
+                                .height(52.dp),
+                            shape = RoundedCornerShape(10.dp),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, BorderMedium),
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = TextPrimary)
                         ) {
-                            Icon(Icons.Default.Share, contentDescription = null)
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text("Share File")
+                            Text("Share file", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold, color = TextPrimary)
                         }
 
                         OutlinedButton(
                             onClick = { openFile() },
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .height(50.dp),
-                            shape = RoundedCornerShape(12.dp)
+                                .height(52.dp),
+                            shape = RoundedCornerShape(10.dp),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, BorderMedium),
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = TextPrimary)
                         ) {
-                            Icon(Icons.Default.OpenInNew, contentDescription = null)
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text("Open in External Viewer")
+                            Text("Open in external viewer", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold, color = TextPrimary)
                         }
                     }
                 }
@@ -269,8 +239,9 @@ fun ResultsScreen(
                     onClick = onNavigateHome,
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Text("Return to Tools")
+                    Text("Return to tools", color = TextSecondary)
                 }
+                Spacer(modifier = Modifier.height(24.dp))
             }
         }
     }

@@ -1,57 +1,50 @@
 package com.filetoolkit.app.ui.theme
 
 import android.app.Activity
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
-import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.SideEffect
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
 
-private val DarkColorScheme = darkColorScheme(
-    primary = Blue40,
-    onPrimary = LightSurface,
-    secondary = Teal60,
-    background = DarkBackground,
-    surface = DarkSurface,
-    surfaceVariant = DarkSurfaceVariant,
-    onBackground = TextPrimaryDark,
-    onSurface = TextPrimaryDark,
-    error = ErrorRed
-)
-
-private val LightColorScheme = lightColorScheme(
-    primary = Blue60,
-    onPrimary = LightSurface,
-    secondary = Teal60,
-    background = LightBackground,
-    surface = LightSurface,
-    surfaceVariant = LightSurfaceVariant,
-    onBackground = TextPrimaryLight,
-    onSurface = TextPrimaryLight,
-    error = ErrorRed
+private val DarkRestrainedColorScheme = darkColorScheme(
+    primary = ActionPrimaryBg,
+    onPrimary = ActionPrimaryText,
+    primaryContainer = SurfaceRaised,
+    onPrimaryContainer = TextPrimary,
+    secondary = TextSecondary,
+    onSecondary = PureBlack,
+    background = PureBlack,
+    onBackground = TextPrimary,
+    surface = SurfaceCharcoal,
+    onSurface = TextPrimary,
+    surfaceVariant = SurfaceRaised,
+    onSurfaceVariant = TextSecondary,
+    outline = BorderMedium,
+    outlineVariant = BorderSubtle,
+    error = StateError,
+    onError = PureBlack
 )
 
 @Composable
 fun FileToolkitTheme(
-    darkTheme: Boolean = isSystemInDarkTheme(),
     content: @Composable () -> Unit
 ) {
-    val colorScheme = if (darkTheme) DarkColorScheme else LightColorScheme
     val view = LocalView.current
     if (!view.isInEditMode) {
         SideEffect {
             val window = (view.context as? Activity)?.window ?: return@SideEffect
-            window.statusBarColor = colorScheme.primary.toArgb()
-            WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = !darkTheme
+            window.statusBarColor = PureBlack.toArgb()
+            window.navigationBarColor = PureBlack.toArgb()
+            WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = false
+            WindowCompat.getInsetsController(window, view).isAppearanceLightNavigationBars = false
         }
     }
 
     MaterialTheme(
-        colorScheme = colorScheme,
+        colorScheme = DarkRestrainedColorScheme,
         typography = Typography,
         content = content
     )

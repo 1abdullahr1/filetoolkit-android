@@ -2,27 +2,25 @@ package com.filetoolkit.app.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
-val Blue60 = Color(0xFF2563EB)
-val Blue80 = Color(0xFF1D4ED8)
-val Blue40 = Color(0xFF3B82F6)
+// Visual Design System from d.md & screenshots
+val PureBlack = Color(0xFF000000)
+val DarkBackground = Color(0xFF0D0D0D)
+val SurfaceCharcoal = Color(0xFF1E1E1E)
+val SurfaceRaised = Color(0xFF2C2C2C)
+val SurfaceInput = Color(0xFF181818)
 
-val Teal60 = Color(0xFF0D9488)
-val Teal80 = Color(0xFF0F766E)
+val TextPrimary = Color(0xFFFFFFFF)
+val TextSecondary = Color(0xFFA3A3A3)
+val TextMuted = Color(0xFF737373)
 
-val DarkBackground = Color(0xFF0F172A)
-val DarkSurface = Color(0xFF1E293B)
-val DarkSurfaceVariant = Color(0xFF334155)
+val BorderSubtle = Color(0xFF333333)
+val BorderMedium = Color(0xFF444444)
+val BorderActive = Color(0xFFFFFFFF)
 
-val LightBackground = Color(0xFFF8FAFC)
-val LightSurface = Color(0xFFFFFFFF)
-val LightSurfaceVariant = Color(0xFFF1F5F9)
+// Action & State Colors
+val ActionPrimaryBg = Color(0xFFFFFFFF)
+val ActionPrimaryText = Color(0xFF000000)
 
-val TextPrimaryDark = Color(0xFFF8FAFC)
-val TextSecondaryDark = Color(0xFF94A3B8)
-
-val TextPrimaryLight = Color(0xFF0F172A)
-val TextSecondaryLight = Color(0xFF64748B)
-
-val SuccessGreen = Color(0xFF16A34A)
-val ErrorRed = Color(0xFFDC2626)
-val WarningAmber = Color(0xFFD97706)
+val StateSuccess = Color(0xFF22C55E)
+val StateError = Color(0xFFEF4444)
+val StateWarning = Color(0xFFF59E0B)
