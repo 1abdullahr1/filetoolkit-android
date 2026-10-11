@@ -20,6 +20,7 @@ import androidx.compose.ui.unit.sp
 import com.filetoolkit.app.data.ToolCategory
 import com.filetoolkit.app.ui.theme.*
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
     onSelectQuickAction: (String) -> Unit,

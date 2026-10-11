@@ -215,7 +215,7 @@ fun RecentScreen(
                                     Text(
                                         text = "Expired",
                                         style = MaterialTheme.typography.labelSmall,
-                                        color = TextTertiary,
+                                        color = TextMuted,
                                         modifier = Modifier.padding(end = 4.dp)
                                     )
                                 }
