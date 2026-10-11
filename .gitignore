@@ -1,0 +1,21 @@
+# Gradle
+.gradle/
+build/
+app/build/
+*.iml
+.idea/
+local.properties
+.DS_Store
+
+# Rust / Cargo
+rust_core/target/
+Cargo.lock
+
+# Android build outputs
+*.apk
+*.aab
+app/src/main/jniLibs/
+!app/src/main/jniLibs/.gitkeep
+
+# Logs and scratch
+*.log

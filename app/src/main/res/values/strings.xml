@@ -1,0 +1,21 @@
+<resources>
+    <string name="app_name">FileToolkit</string>
+    <string name="app_tagline">All-in-One File Converter &amp; PDF Toolkit</string>
+    <string name="home_title">FileToolkit</string>
+    <string name="search_tools_hint">Search tools (e.g. JPG to PNG, Merge PDF)</string>
+    <string name="category_images">Images</string>
+    <string name="category_documents">Documents</string>
+    <string name="category_pdf">PDF Tools</string>
+    <string name="category_text">Text Tools</string>
+    <string name="category_history">History</string>
+    <string name="recent_operations">Recent Operations</string>
+    <string name="no_recent_operations">No recent operations yet.</string>
+    <string name="select_file">Select File</string>
+    <string name="select_files">Select Files</string>
+    <string name="convert_now">Convert Now</string>
+    <string name="save_file">Save to Device</string>
+    <string name="share_file">Share File</string>
+    <string name="open_file">Open File</string>
+    <string name="clear_history">Clear History</string>
+    <string name="settings">Settings</string>
+</resources>
