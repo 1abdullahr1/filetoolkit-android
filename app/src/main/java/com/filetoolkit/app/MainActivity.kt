@@ -60,7 +60,15 @@ class MainActivity : ComponentActivity() {
                             PersistentBottomNav(
                                 currentRoute = currentRoute ?: "home",
                                 onNavigate = { route ->
-                                    if (currentRoute != route) {
+                                    if (route == "home") {
+                                        val popped = navController.popBackStack("home", inclusive = false)
+                                        if (!popped) {
+                                            navController.navigate("home") {
+                                                popUpTo("home") { inclusive = true }
+                                                launchSingleTop = true
+                                            }
+                                        }
+                                    } else if (currentRoute != route) {
                                         navController.navigate(route) {
                                             popUpTo("home") { saveState = true }
                                             launchSingleTop = true
@@ -288,34 +296,37 @@ fun PersistentBottomNav(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(64.dp)
-                .padding(horizontal = 8.dp),
-            horizontalArrangement = Arrangement.SpaceAround,
+                .height(64.dp),
+            horizontalArrangement = Arrangement.SpaceEvenly,
             verticalAlignment = Alignment.CenterVertically
         ) {
             BottomNavItem(
                 label = "Home",
                 icon = Icons.Default.Home,
                 selected = currentRoute == "home",
-                onClick = { onNavigate("home") }
+                onClick = { onNavigate("home") },
+                modifier = Modifier.weight(1f)
             )
             BottomNavItem(
                 label = "Tools",
                 icon = Icons.Default.GridView,
                 selected = currentRoute == "tools",
-                onClick = { onNavigate("tools") }
+                onClick = { onNavigate("tools") },
+                modifier = Modifier.weight(1f)
             )
             BottomNavItem(
                 label = "Recent",
                 icon = Icons.Default.History,
                 selected = currentRoute == "recent",
-                onClick = { onNavigate("recent") }
+                onClick = { onNavigate("recent") },
+                modifier = Modifier.weight(1f)
             )
             BottomNavItem(
                 label = "Settings",
                 icon = Icons.Default.Settings,
                 selected = currentRoute == "settings",
-                onClick = { onNavigate("settings") }
+                onClick = { onNavigate("settings") },
+                modifier = Modifier.weight(1f)
             )
         }
     }
@@ -326,28 +337,33 @@ fun BottomNavItem(
     label: String,
     icon: ImageVector,
     selected: Boolean,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
-    Column(
-        modifier = Modifier
-            .clickable(onClick = onClick)
-            .padding(horizontal = 16.dp, vertical = 6.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
+    Box(
+        modifier = modifier
+            .fillMaxHeight()
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center
     ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = label,
-            tint = if (selected) TextPrimary else TextMuted,
-            modifier = Modifier.size(22.dp)
-        )
-        Spacer(modifier = Modifier.height(3.dp))
-        Text(
-            text = label,
-            style = MaterialTheme.typography.labelMedium,
-            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
-            color = if (selected) TextPrimary else TextMuted,
-            fontSize = 11.sp
-        )
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = label,
+                tint = if (selected) TextPrimary else TextMuted,
+                modifier = Modifier.size(22.dp)
+            )
+            Spacer(modifier = Modifier.height(3.dp))
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+                color = if (selected) TextPrimary else TextMuted,
+                fontSize = 11.sp
+            )
+        }
     }
 }
