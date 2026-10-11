@@ -499,8 +499,8 @@ pub fn images_to_pdf(req: &ImagesToPdfRequest) -> Result<OperationResult, Toolki
         page_dict.set("MediaBox", Object::Array(vec![
             Object::Integer(0),
             Object::Integer(0),
-            Object::Real(page_w),
-            Object::Real(page_h),
+            Object::Real(page_w as f32),
+            Object::Real(page_h as f32),
         ]));
         page_dict.set("Contents", Object::Reference(content_id));
         page_dict.set("Resources", Object::Dictionary(resources));

@@ -16,7 +16,7 @@ use crate::pdf_tools::{
 };
 use crate::text_tools::{text_to_image, text_to_pdf};
 
-fn make_jstring<'a>(mut env: JNIEnv<'a>, text: &str) -> jstring {
+fn make_jstring<'a>(env: JNIEnv<'a>, text: &str) -> jstring {
     env.new_string(text).map(|s| s.into_raw()).unwrap_or(std::ptr::null_mut())
 }
 
@@ -95,7 +95,7 @@ pub extern "system" fn Java_com_filetoolkit_app_data_NativeBridge_processBatchIm
 
     let req: BatchImageRequest = match serde_json::from_str(&json_str) {
         Ok(r) => r,
-        Err(_) => return make_jstring(env, &format!(r#"{{"total": 0, "succeeded": 0, "failed": 0, "items": []}}"#)),
+        Err(_e) => return make_jstring(env, &format!(r#"{{"total": 0, "succeeded": 0, "failed": 0, "items": []}}"#)),
     };
 
     let batch_res = process_batch_images(&req);
