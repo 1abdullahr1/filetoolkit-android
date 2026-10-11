@@ -1,5 +1,3 @@
-use std::fs::File;
-use std::io::Write;
 use rust_core::image_tools::{convert_image, process_batch_images};
 use rust_core::metadata_tools::{detect_format_from_bytes, inspect_file};
 use rust_core::models::*;

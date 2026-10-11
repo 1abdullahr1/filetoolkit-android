@@ -27,49 +27,55 @@ pub fn merge_pdfs(req: &PdfMergeRequest) -> Result<OperationResult, ToolkitError
         .map_err(|e| ToolkitError::PdfError(format!("Failed to load '{}': {}", req.input_paths[0], e)))?;
 
     for path in &req.input_paths[1..] {
-        let doc = Document::load(path)
+        let mut doc_to_merge = Document::load(path)
             .map_err(|e| ToolkitError::PdfError(format!("Failed to load '{}': {}", path, e)))?;
 
-        // Merge doc into target_doc
-        let mut doc_to_merge = doc;
         let offset = target_doc.max_id + 1;
         doc_to_merge.renumber_objects_with(offset);
 
-        // Extract catalog and pages
-        let doc_pages = doc_to_merge.get_pages();
-        for (page_num, page_id) in doc_pages {
-            if let Ok(page_obj) = doc_to_merge.get_object(page_id) {
-                target_doc.objects.insert(page_id, page_obj.clone());
-            }
-        }
-
-        // Copy all other objects
-        for (id, obj) in doc_to_merge.objects {
-            target_doc.objects.entry(id).or_insert(obj);
-        }
-
-        // Update target pages tree
-        let catalog_id = target_doc.trailer.get(b"Root")
+        let target_catalog_id = target_doc.trailer.get(b"Root")
             .and_then(|o| o.as_reference())
             .map_err(|e| ToolkitError::PdfError(format!("Invalid catalog: {}", e)))?;
 
-        let pages_id = target_doc.get_object(catalog_id)
+        let target_pages_id = target_doc.get_object(target_catalog_id)
             .and_then(|o| o.as_dict())
             .and_then(|d| d.get(b"Pages"))
             .and_then(|o| o.as_reference())
             .map_err(|e| ToolkitError::PdfError(format!("Invalid pages dict: {}", e)))?;
 
-        // Re-collect pages and update target catalog Pages kids & count
-        let current_pages = target_doc.get_pages();
-        let kids_vec: Vec<Object> = current_pages.values().map(|id| Object::Reference(*id)).collect();
-        let count = kids_vec.len() as i64;
+        let doc_pages = doc_to_merge.get_pages();
+        let new_page_ids: Vec<ObjectId> = doc_pages.values().copied().collect();
 
-        if let Ok(pages_dict) = target_doc.get_object_mut(pages_id).and_then(|o| o.as_dict_mut()) {
-            pages_dict.set("Kids", Object::Array(kids_vec));
-            pages_dict.set("Count", Object::Integer(count));
+        // Update each new page's Parent to target_pages_id
+        for &page_id in &new_page_ids {
+            if let Ok(page_dict) = doc_to_merge.get_object_mut(page_id).and_then(|o| o.as_dict_mut()) {
+                page_dict.set("Parent", Object::Reference(target_pages_id));
+            }
         }
+
+        // Copy all objects from doc_to_merge into target_doc
+        for (id, obj) in doc_to_merge.objects {
+            target_doc.objects.insert(id, obj);
+        }
+
+        // Append new page IDs to target_doc's Pages dict
+        if let Ok(pages_dict) = target_doc.get_object_mut(target_pages_id).and_then(|o| o.as_dict_mut()) {
+            let mut existing_kids: Vec<Object> = match pages_dict.get(b"Kids") {
+                Ok(Object::Array(ref arr)) => arr.clone(),
+                _ => Vec::new(),
+            };
+            for page_id in new_page_ids {
+                existing_kids.push(Object::Reference(page_id));
+            }
+            let total_count = existing_kids.len() as i64;
+            pages_dict.set("Kids", Object::Array(existing_kids));
+            pages_dict.set("Count", Object::Integer(total_count));
+        }
+
+        target_doc.max_id = offset + doc_to_merge.max_id;
     }
 
+    target_doc.trailer.set("Size", Object::Integer((target_doc.max_id + 1) as i64));
     target_doc.prune_objects();
 
     let out_path = Path::new(&req.output_path);
