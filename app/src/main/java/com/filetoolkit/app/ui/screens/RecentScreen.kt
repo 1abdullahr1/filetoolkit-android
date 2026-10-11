@@ -184,31 +184,39 @@ fun RecentScreen(
                             }
 
                             if (item.isSuccess) {
-                                IconButton(onClick = {
-                                    val file = File(item.outputFilePath)
-                                    if (file.exists()) {
-                                        try {
-                                            val uri: Uri = FileProvider.getUriForFile(
-                                                context,
-                                                "${context.packageName}.fileprovider",
-                                                file
-                                            )
-                                            val intent = Intent(Intent.ACTION_VIEW).apply {
-                                                setDataAndType(uri, if (file.extension == "pdf") "application/pdf" else "image/*")
-                                                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                val fileExists = remember(item.outputFilePath) { File(item.outputFilePath).exists() }
+                                if (fileExists) {
+                                    IconButton(onClick = {
+                                        val file = File(item.outputFilePath)
+                                        if (file.exists()) {
+                                            try {
+                                                val uri: Uri = FileProvider.getUriForFile(
+                                                    context,
+                                                    "${context.packageName}.fileprovider",
+                                                    file
+                                                )
+                                                val intent = Intent(Intent.ACTION_VIEW).apply {
+                                                    setDataAndType(uri, if (file.extension == "pdf") "application/pdf" else "image/*")
+                                                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                                }
+                                                context.startActivity(intent)
+                                            } catch (e: Exception) {
+                                                Toast.makeText(context, "Cannot open file", Toast.LENGTH_SHORT).show()
                                             }
-                                            context.startActivity(intent)
-                                        } catch (e: Exception) {
-                                            Toast.makeText(context, "Cannot open file", Toast.LENGTH_SHORT).show()
                                         }
-                                    } else {
-                                        Toast.makeText(context, "File was removed from cache", Toast.LENGTH_SHORT).show()
+                                    }) {
+                                        Icon(
+                                            imageVector = Icons.Default.OpenInNew,
+                                            contentDescription = "Open",
+                                            tint = TextSecondary
+                                        )
                                     }
-                                }) {
-                                    Icon(
-                                        imageVector = Icons.Default.OpenInNew,
-                                        contentDescription = "Open",
-                                        tint = TextSecondary
+                                } else {
+                                    Text(
+                                        text = "Expired",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = TextTertiary,
+                                        modifier = Modifier.padding(end = 4.dp)
                                     )
                                 }
                             }

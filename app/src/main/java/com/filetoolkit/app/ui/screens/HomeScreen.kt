@@ -20,13 +20,13 @@ import androidx.compose.ui.unit.sp
 import com.filetoolkit.app.data.ToolCategory
 import com.filetoolkit.app.ui.theme.*
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
     onSelectQuickAction: (String) -> Unit,
     onSelectCategory: (ToolCategory) -> Unit,
     onSearchClick: () -> Unit,
-    onHistoryClick: () -> Unit
+    onHistoryClick: () -> Unit,
+    onOpenFormatMatrix: () -> Unit = {}
 ) {
     Scaffold(
         containerColor = PureBlack,
@@ -160,9 +160,9 @@ fun HomeScreen(
                             modifier = Modifier.weight(1f)
                         )
                         CategoryGridCard(
-                            title = "Document tools",
-                            icon = Icons.Default.Description,
-                            onClick = { onSelectCategory(ToolCategory.DOCUMENTS) },
+                            title = "Format matrix",
+                            icon = Icons.Default.GridOn,
+                            onClick = onOpenFormatMatrix,
                             modifier = Modifier.weight(1f)
                         )
                     }

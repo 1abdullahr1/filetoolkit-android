@@ -47,6 +47,7 @@ fun ImageToolScreen(
     var baseRatio by remember { mutableStateOf<Float?>(null) }
     var maintainAspectRatio by remember { mutableStateOf(true) }
     var isProcessing by remember { mutableStateOf(false) }
+    var processingMessage by remember { mutableStateOf("Processing image...") }
     var processingJob by remember { mutableStateOf<Job?>(null) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
 
@@ -80,6 +81,15 @@ fun ImageToolScreen(
                         widthInput = info.width.toString()
                         heightInput = info.height.toString()
                         baseRatio = info.width.toFloat() / info.height.toFloat()
+                    }
+                    if (tool.id == "img_compress") {
+                        val detected = info.format.lowercase()
+                        targetFormat = when (detected) {
+                            "png" -> "PNG"
+                            "webp" -> "WEBP"
+                            "bmp" -> "BMP"
+                            else -> "JPEG"
+                        }
                     }
                 }
             }
@@ -425,6 +435,7 @@ fun ImageToolScreen(
                     onClick = {
                         isProcessing = true
                         errorMessage = null
+                        processingMessage = if (selectedFiles.size > 1) "Processing image 1 of ${selectedFiles.size}..." else "Processing image..."
                         processingJob = scope.launch(Dispatchers.IO) {
                             try {
                                 if (tool.id == "img_to_pdf") {
@@ -439,9 +450,13 @@ fun ImageToolScreen(
                                         onResult(result, tool.title)
                                     }
                                 } else if (selectedFiles.size > 1) {
-                                    val batchItems = selectedFiles.map { file ->
+                                    val batchResults = mutableListOf<OperationResult>()
+                                    for ((idx, file) in selectedFiles.withIndex()) {
+                                        withContext(Dispatchers.Main) {
+                                            processingMessage = "Processing image ${idx + 1} of ${selectedFiles.size}..."
+                                        }
                                         val outFile = File(context.cacheDir, "conv_${System.currentTimeMillis()}_${file.filename}.$targetFormat")
-                                        ImageConvertRequest(
+                                        val req = ImageConvertRequest(
                                             inputPath = file.path,
                                             outputPath = outFile.absolutePath,
                                             targetFormat = targetFormat,
@@ -450,10 +465,9 @@ fun ImageToolScreen(
                                             height = heightInput.toIntOrNull(),
                                             keepAspectRatio = maintainAspectRatio
                                         )
+                                        batchResults.add(NativeBridge.convertImg(req))
                                     }
-                                    val batchReq = BatchImageRequest(items = batchItems)
-                                    val batchRes = NativeBridge.batchConvertImg(batchReq)
-                                    val primaryResult = batchRes.items.firstOrNull() ?: OperationResult(false, errorMessage = "Batch failed")
+                                    val primaryResult = batchResults.firstOrNull { it.success } ?: batchResults.firstOrNull() ?: OperationResult(false, errorMessage = "Batch failed")
                                     withContext(Dispatchers.Main) {
                                         isProcessing = false
                                         onResult(primaryResult, tool.title)
@@ -495,7 +509,7 @@ fun ImageToolScreen(
 
         if (isProcessing) {
             ProcessingModal(
-                message = "Processing image...",
+                message = processingMessage,
                 onCancel = {
                     processingJob?.cancel()
                     isProcessing = false

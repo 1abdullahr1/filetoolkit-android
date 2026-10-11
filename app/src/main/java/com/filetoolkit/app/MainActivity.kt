@@ -17,6 +17,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -30,6 +31,7 @@ import androidx.navigation.compose.rememberNavController
 import com.filetoolkit.app.data.*
 import com.filetoolkit.app.ui.screens.*
 import com.filetoolkit.app.ui.theme.*
+import com.google.gson.Gson
 import java.io.File
 
 class MainActivity : ComponentActivity() {
@@ -38,15 +40,27 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         historyRepository = HistoryRepository(applicationContext)
+        CacheManager.pruneOldCache(applicationContext)
 
         setContent {
             FileToolkitTheme {
                 val navController = rememberNavController()
                 val historyList by historyRepository.history.collectAsState()
+                val gson = remember { Gson() }
 
-                var currentTool by remember { mutableStateOf<ToolDefinition?>(null) }
-                var lastResult by remember { mutableStateOf<OperationResult?>(null) }
-                var lastToolTitle by remember { mutableStateOf("") }
+                var currentToolId by rememberSaveable { mutableStateOf<String?>(null) }
+                val currentTool = currentToolId?.let { ToolRepository.findTool(it) }
+                var lastResultJson by rememberSaveable { mutableStateOf<String?>(null) }
+                val lastResult = remember(lastResultJson) {
+                    lastResultJson?.let {
+                        try {
+                            gson.fromJson(it, OperationResult::class.java)
+                        } catch (e: Exception) {
+                            null
+                        }
+                    }
+                }
+                var lastToolTitle by rememberSaveable { mutableStateOf("") }
 
                 val navBackStackEntry by navController.currentBackStackEntryAsState()
                 val currentRoute = navBackStackEntry?.destination?.route
@@ -94,7 +108,7 @@ class MainActivity : ComponentActivity() {
                             HomeScreen(
                                 onSelectQuickAction = { toolId ->
                                     val tool = ToolRepository.findTool(toolId) ?: ToolRepository.allTools.first()
-                                    currentTool = tool
+                                    currentToolId = tool.id
                                     when (tool.category) {
                                         ToolCategory.IMAGES -> navController.navigate("tool_image")
                                         ToolCategory.PDF -> navController.navigate("tool_pdf")
@@ -110,6 +124,9 @@ class MainActivity : ComponentActivity() {
                                 },
                                 onHistoryClick = {
                                     navController.navigate("recent")
+                                },
+                                onOpenFormatMatrix = {
+                                    navController.navigate("format_matrix")
                                 }
                             )
                         }
@@ -118,7 +135,7 @@ class MainActivity : ComponentActivity() {
                         composable("tools") {
                             ToolsScreen(
                                 onSelectTool = { tool ->
-                                    currentTool = tool
+                                    currentToolId = tool.id
                                     when (tool.category) {
                                         ToolCategory.IMAGES -> navController.navigate("tool_image")
                                         ToolCategory.PDF -> navController.navigate("tool_pdf")
@@ -159,7 +176,7 @@ class MainActivity : ComponentActivity() {
                                     tool = tool,
                                     onNavigateBack = { navController.popBackStack() },
                                     onResult = { res, title ->
-                                        lastResult = res
+                                        lastResultJson = gson.toJson(res)
                                         lastToolTitle = title
                                         if (res.outputPath != null) {
                                             val outFile = File(res.outputPath)
@@ -195,7 +212,7 @@ class MainActivity : ComponentActivity() {
                                     tool = tool,
                                     onNavigateBack = { navController.popBackStack() },
                                     onResult = { res, title ->
-                                        lastResult = res
+                                        lastResultJson = gson.toJson(res)
                                         lastToolTitle = title
                                         if (res.outputPath != null) {
                                             val outFile = File(res.outputPath)
@@ -231,7 +248,7 @@ class MainActivity : ComponentActivity() {
                                     tool = tool,
                                     onNavigateBack = { navController.popBackStack() },
                                     onResult = { res, title ->
-                                        lastResult = res
+                                        lastResultJson = gson.toJson(res)
                                         lastToolTitle = title
                                         if (res.outputPath != null) {
                                             val outFile = File(res.outputPath)

@@ -47,6 +47,7 @@ fun PdfToolScreen(
     var rotationDegrees by remember { mutableStateOf(90) }
     var watermarkText by remember { mutableStateOf("CONFIDENTIAL") }
     var pageNumFormat by remember { mutableStateOf("Page {n} of {total}") }
+    var splitPagesPerFile by remember { mutableIntStateOf(1) }
     var isProcessing by remember { mutableStateOf(false) }
     var processingJob by remember { mutableStateOf<Job?>(null) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
@@ -268,6 +269,27 @@ fun PdfToolScreen(
                             )
                         }
                     }
+                    "pdf_split" -> {
+                        item {
+                            Text("Pages per document", style = MaterialTheme.typography.bodySmall, color = TextSecondary)
+                            Spacer(modifier = Modifier.height(6.dp))
+                            FormatChipSelector(
+                                options = listOf("1 page", "2 pages", "5 pages", "10 pages"),
+                                selectedOption = "$splitPagesPerFile page" + if (splitPagesPerFile > 1) "s" else "",
+                                onOptionSelected = {
+                                    splitPagesPerFile = it.replace(" pages", "").replace(" page", "").trim().toIntOrNull() ?: 1
+                                }
+                            )
+                        }
+
+                        item {
+                            PdfPageSelectorGrid(
+                                pdfPath = selectedFiles.first().path,
+                                selectedPages = emptySet(),
+                                onSelectionChange = {}
+                            )
+                        }
+                    }
                 }
             }
 
@@ -292,6 +314,17 @@ fun PdfToolScreen(
                                             outputPath = outFile.absolutePath
                                         )
                                         NativeBridge.merge(req)
+                                    }
+                                    "pdf_split" -> {
+                                        val req = PdfSplitRequest(
+                                            inputPath = primaryFile.path,
+                                            outputDir = context.cacheDir.absolutePath,
+                                            pagesPerFile = splitPagesPerFile
+                                        )
+                                        val splitResults = NativeBridge.split(req)
+                                        splitResults.firstOrNull { it.success }
+                                            ?: splitResults.firstOrNull()
+                                            ?: OperationResult(false, inputPath = primaryFile.path, errorMessage = "Failed to split PDF")
                                     }
                                     "pdf_extract" -> {
                                         val pages = pageInput.split(",")
