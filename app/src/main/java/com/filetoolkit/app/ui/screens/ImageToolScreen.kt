@@ -42,6 +42,8 @@ fun ImageToolScreen(
     var quality by remember { mutableStateOf(85f) }
     var widthInput by remember { mutableStateOf("1920") }
     var heightInput by remember { mutableStateOf("1080") }
+    var isCropMode by remember { mutableStateOf(tool.id == "img_resize") }
+    var cropCoords by remember { mutableStateOf<CropCoordinates?>(null) }
     var baseRatio by remember { mutableStateOf<Float?>(null) }
     var maintainAspectRatio by remember { mutableStateOf(true) }
     var isProcessing by remember { mutableStateOf(false) }
@@ -153,13 +155,26 @@ fun ImageToolScreen(
                     )
                 }
 
-                // Live preview card for primary image
+                // Live preview or interactive crop for primary image
                 if (selectedFiles.isNotEmpty()) {
-                    item {
-                        ImagePreviewCard(
-                            filePath = selectedFiles.first().path,
-                            modifier = Modifier.padding(bottom = 6.dp)
-                        )
+                    if (isCropMode && selectedFiles.size == 1) {
+                        item {
+                            InteractiveImageCropper(
+                                imagePath = selectedFiles.first().path,
+                                onCropChange = { coords ->
+                                    cropCoords = coords
+                                    widthInput = coords.width.toString()
+                                    heightInput = coords.height.toString()
+                                }
+                            )
+                        }
+                    } else {
+                        item {
+                            ImagePreviewCard(
+                                filePath = selectedFiles.first().path,
+                                modifier = Modifier.padding(bottom = 6.dp)
+                            )
+                        }
                     }
                 }
 
@@ -200,6 +215,44 @@ fun ImageToolScreen(
 
             // Dimensions Section (Screenshot 3)
             if (tool.id == "img_resize" || tool.id == "img_convert") {
+                if (selectedFiles.size == 1) {
+                    item {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { isCropMode = !isCropMode }
+                                .padding(vertical = 4.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    imageVector = Icons.Default.Crop,
+                                    contentDescription = null,
+                                    tint = TextPrimary,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = "Direct finger crop",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    color = TextPrimary
+                                )
+                            }
+                            Switch(
+                                checked = isCropMode,
+                                onCheckedChange = { isCropMode = it },
+                                colors = SwitchDefaults.colors(
+                                    checkedThumbColor = PureBlack,
+                                    checkedTrackColor = PureWhite,
+                                    uncheckedThumbColor = TextSecondary,
+                                    uncheckedTrackColor = SurfaceInput
+                                )
+                            )
+                        }
+                    }
+                }
+
                 item {
                     Text(
                         text = "Dimensions",
@@ -413,8 +466,12 @@ fun ImageToolScreen(
                                         outputPath = outFile.absolutePath,
                                         targetFormat = targetFormat,
                                         quality = quality.toInt(),
-                                        width = widthInput.toIntOrNull(),
-                                        height = heightInput.toIntOrNull(),
+                                        width = if (isCropMode) null else widthInput.toIntOrNull(),
+                                        height = if (isCropMode) null else heightInput.toIntOrNull(),
+                                        cropX = if (isCropMode) cropCoords?.x else null,
+                                        cropY = if (isCropMode) cropCoords?.y else null,
+                                        cropWidth = if (isCropMode) cropCoords?.width else null,
+                                        cropHeight = if (isCropMode) cropCoords?.height else null,
                                         keepAspectRatio = maintainAspectRatio
                                     )
                                     val result = NativeBridge.convertImg(req)

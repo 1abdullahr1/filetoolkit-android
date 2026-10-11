@@ -43,6 +43,7 @@ fun PdfToolScreen(
     var selectedFiles by remember { mutableStateOf<List<FileInfo>>(emptyList()) }
     var originalOrder by remember { mutableStateOf<List<FileInfo>>(emptyList()) }
     var pageInput by remember { mutableStateOf("1") }
+    var selectedPages by remember { mutableStateOf<Set<Int>>(setOf(1)) }
     var rotationDegrees by remember { mutableStateOf(90) }
     var watermarkText by remember { mutableStateOf("CONFIDENTIAL") }
     var pageNumFormat by remember { mutableStateOf("Page {n} of {total}") }
@@ -198,10 +199,30 @@ fun PdfToolScreen(
                 when (tool.id) {
                     "pdf_extract", "pdf_delete_pages" -> {
                         item {
+                            PdfPageSelectorGrid(
+                                pdfPath = selectedFiles.first().path,
+                                selectedPages = selectedPages,
+                                onSelectionChange = { newSelection ->
+                                    selectedPages = newSelection
+                                    pageInput = newSelection.sorted().joinToString(", ")
+                                }
+                            )
+                        }
+
+                        item {
                             DarkInputField(
-                                label = "Page numbers (comma-separated, e.g. 1, 3, 5)",
+                                label = "Or enter page numbers (e.g. 1, 3, 5)",
                                 value = pageInput,
-                                onValueChange = { pageInput = it }
+                                onValueChange = { inputStr ->
+                                    pageInput = inputStr
+                                    val parsed = inputStr.split(",")
+                                        .mapNotNull { it.trim().toIntOrNull() }
+                                        .filter { it > 0 }
+                                        .toSet()
+                                    if (parsed.isNotEmpty()) {
+                                        selectedPages = parsed
+                                    }
+                                }
                             )
                         }
                     }
@@ -215,6 +236,17 @@ fun PdfToolScreen(
                                 onOptionSelected = {
                                     rotationDegrees = it.replace("°", "").toIntOrNull() ?: 90
                                 }
+                            )
+                        }
+
+                        item {
+                            PdfPageSelectorGrid(
+                                pdfPath = selectedFiles.first().path,
+                                selectedPages = selectedPages,
+                                onSelectionChange = { newSelection ->
+                                    selectedPages = newSelection
+                                },
+                                previewRotation = rotationDegrees
                             )
                         }
                     }
