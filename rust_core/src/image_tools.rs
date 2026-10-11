@@ -54,6 +54,53 @@ pub fn convert_image(req: &ImageConvertRequest) -> Result<OperationResult, Toolk
         }
     }
 
+    // Circle Cropping
+    if req.circle_crop.unwrap_or(false) {
+        let (w, h) = img.dimensions();
+        let size = w.min(h);
+        if size > 0 {
+            let offset_x = (w - size) / 2;
+            let offset_y = (h - size) / 2;
+            let square_img = img.crop_imm(offset_x, offset_y, size, size);
+            let rgba_img = square_img.to_rgba8();
+            let radius = size as f32 / 2.0;
+            let center = radius;
+
+            let bg_color = req.bg_color_hex.as_deref().map(parse_hex_color);
+            let mut out_img = image::RgbaImage::new(size, size);
+
+            for (x, y, pixel) in rgba_img.enumerate_pixels() {
+                let dx = (x as f32 + 0.5) - center;
+                let dy = (y as f32 + 0.5) - center;
+                let dist = (dx * dx + dy * dy).sqrt();
+
+                if dist > radius + 0.5 {
+                    if let Some(bg) = bg_color {
+                        out_img.put_pixel(x, y, Rgba([bg.0, bg.1, bg.2, 255]));
+                    } else {
+                        out_img.put_pixel(x, y, Rgba([0, 0, 0, 0]));
+                    }
+                } else if dist < radius - 0.5 {
+                    out_img.put_pixel(x, y, *pixel);
+                } else {
+                    let alpha_factor = (radius + 0.5 - dist).clamp(0.0, 1.0);
+                    let original_alpha = pixel[3] as f32 / 255.0;
+                    let final_alpha = (original_alpha * alpha_factor * 255.0).round() as u8;
+                    if let Some(bg) = bg_color {
+                        let a = final_alpha as f32 / 255.0;
+                        let r = ((pixel[0] as f32 * a) + (bg.0 as f32 * (1.0 - a))).round() as u8;
+                        let g = ((pixel[1] as f32 * a) + (bg.1 as f32 * (1.0 - a))).round() as u8;
+                        let b = ((pixel[2] as f32 * a) + (bg.2 as f32 * (1.0 - a))).round() as u8;
+                        out_img.put_pixel(x, y, Rgba([r, g, b, 255]));
+                    } else {
+                        out_img.put_pixel(x, y, Rgba([pixel[0], pixel[1], pixel[2], final_alpha]));
+                    }
+                }
+            }
+            img = DynamicImage::ImageRgba8(out_img);
+        }
+    }
+
     // Rotation
     if let Some(deg) = req.rotation_degrees {
         let norm_deg = ((deg % 360) + 360) % 360;
@@ -169,3 +216,48 @@ pub fn process_batch_images(req: &BatchImageRequest) -> BatchResult {
         items,
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_circle_crop() {
+        let mut img = image::RgbaImage::new(100, 100);
+        for pixel in img.pixels_mut() {
+            *pixel = Rgba([255, 0, 0, 255]);
+        }
+        let temp_dir = tempfile::tempdir().unwrap();
+        let in_path = temp_dir.path().join("in.png");
+        let out_path = temp_dir.path().join("out.png");
+        img.save(&in_path).unwrap();
+
+        let req = ImageConvertRequest {
+            input_path: in_path.to_str().unwrap().to_string(),
+            output_path: out_path.to_str().unwrap().to_string(),
+            target_format: "png".to_string(),
+            quality: None,
+            width: None,
+            height: None,
+            keep_aspect_ratio: None,
+            rotation_degrees: None,
+            crop_x: None,
+            crop_y: None,
+            crop_width: None,
+            crop_height: None,
+            strip_metadata: None,
+            bg_color_hex: None,
+            circle_crop: Some(true),
+        };
+
+        let res = convert_image(&req).unwrap();
+        assert!(res.success);
+        let out_img = image::open(&out_path).unwrap().to_rgba8();
+        // Center pixel should be red
+        assert_eq!(out_img.get_pixel(50, 50)[0], 255);
+        assert_eq!(out_img.get_pixel(50, 50)[3], 255);
+        // Corner pixel (0, 0) should be transparent
+        assert_eq!(out_img.get_pixel(0, 0)[3], 0);
+    }
+}
+

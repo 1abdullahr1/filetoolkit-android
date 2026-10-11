@@ -68,6 +68,15 @@ object ToolRepository {
             acceptedMimeTypes = listOf("image/*")
         ),
         ToolDefinition(
+            id = "img_circle_crop",
+            title = "Circle Crop",
+            description = "Crop images into perfect circular badges with transparency",
+            category = ToolCategory.IMAGES,
+            iconName = "account_circle",
+            acceptsMultiple = false,
+            acceptedMimeTypes = listOf("image/*")
+        ),
+        ToolDefinition(
             id = "img_compress",
             title = "Compress Image",
             description = "Reduce image file size and strip unnecessary metadata",

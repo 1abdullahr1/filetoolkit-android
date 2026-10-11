@@ -47,7 +47,8 @@ data class ImageConvertRequest(
     @SerializedName("crop_width") val cropWidth: Int? = null,
     @SerializedName("crop_height") val cropHeight: Int? = null,
     @SerializedName("strip_metadata") val stripMetadata: Boolean? = null,
-    @SerializedName("bg_color_hex") val bgColorHex: String? = null
+    @SerializedName("bg_color_hex") val bgColorHex: String? = null,
+    @SerializedName("circle_crop") val circleCrop: Boolean? = null
 )
 
 data class BatchImageRequest(

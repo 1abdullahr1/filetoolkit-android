@@ -20,6 +20,7 @@ import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.PathFillType
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
@@ -31,6 +32,7 @@ import com.filetoolkit.app.ui.theme.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
+import kotlin.math.abs
 import kotlin.math.roundToInt
 
 data class CropCoordinates(
@@ -53,6 +55,7 @@ enum class DragHandle {
 fun InteractiveImageCropper(
     imagePath: String,
     onCropChange: (CropCoordinates) -> Unit,
+    isCircleMode: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     var bitmap by remember(imagePath) { mutableStateOf<Bitmap?>(null) }
@@ -67,7 +70,7 @@ fun InteractiveImageCropper(
 
     var selectedAspect by remember { mutableStateOf("Free") }
 
-    LaunchedEffect(imagePath) {
+    LaunchedEffect(imagePath, isCircleMode) {
         val bmp = withContext(Dispatchers.IO) {
             try {
                 val file = File(imagePath)
@@ -87,15 +90,42 @@ fun InteractiveImageCropper(
             }
         }
         bitmap = bmp
+
+        if (isCircleMode && origWidth > 0 && origHeight > 0) {
+            val imageAspect = origWidth.toFloat() / origHeight.toFloat()
+            if (imageAspect >= 1f) {
+                val hNorm = 0.82f
+                val wNorm = (hNorm / imageAspect).coerceIn(0.15f, 0.95f)
+                normLeft = 0.5f - wNorm / 2f
+                normRight = 0.5f + wNorm / 2f
+                normTop = 0.5f - hNorm / 2f
+                normBottom = 0.5f + hNorm / 2f
+            } else {
+                val wNorm = 0.82f
+                val hNorm = (wNorm * imageAspect).coerceIn(0.15f, 0.95f)
+                normLeft = 0.5f - wNorm / 2f
+                normRight = 0.5f + wNorm / 2f
+                normTop = 0.5f - hNorm / 2f
+                normBottom = 0.5f + hNorm / 2f
+            }
+        }
     }
 
     // Sync crop changes to parent
-    LaunchedEffect(normLeft, normTop, normRight, normBottom, origWidth, origHeight) {
+    LaunchedEffect(normLeft, normTop, normRight, normBottom, origWidth, origHeight, isCircleMode) {
         val px = (normLeft * origWidth).roundToInt().coerceAtLeast(0)
         val py = (normTop * origHeight).roundToInt().coerceAtLeast(0)
         val pw = ((normRight - normLeft) * origWidth).roundToInt().coerceAtLeast(1)
         val ph = ((normBottom - normTop) * origHeight).roundToInt().coerceAtLeast(1)
-        onCropChange(CropCoordinates(x = px, y = py, width = pw, height = ph))
+
+        if (isCircleMode) {
+            val sizePx = minOf(pw, ph)
+            val finalX = (px + (pw - sizePx) / 2).coerceIn(0, (origWidth - sizePx).coerceAtLeast(0))
+            val finalY = (py + (ph - sizePx) / 2).coerceIn(0, (origHeight - sizePx).coerceAtLeast(0))
+            onCropChange(CropCoordinates(x = finalX, y = finalY, width = sizePx, height = sizePx))
+        } else {
+            onCropChange(CropCoordinates(x = px, y = py, width = pw, height = ph))
+        }
     }
 
     fun applyAspectRatio(aspect: String) {
@@ -110,9 +140,7 @@ fun InteractiveImageCropper(
             else -> return // Freeform keeps current
         }
 
-        // Target aspect in pixels
         val targetImageRatio = (origWidth.toFloat() / origHeight.toFloat())
-        // Adjust normalized width/height according to image aspect ratio
         val normRatio = ratio / targetImageRatio
 
         var newW = (normRight - normLeft)
@@ -147,7 +175,7 @@ fun InteractiveImageCropper(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
-                text = "Manual Crop (Drag with fingers)",
+                text = if (isCircleMode) "Circle crop area" else "Manual crop area",
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
                 color = TextPrimary
@@ -156,36 +184,38 @@ fun InteractiveImageCropper(
             val pxW = ((normRight - normLeft) * origWidth).roundToInt().coerceAtLeast(1)
             val pxH = ((normBottom - normTop) * origHeight).roundToInt().coerceAtLeast(1)
             Text(
-                text = "$pxW × $pxH px",
+                text = if (isCircleMode) "Ø ${minOf(pxW, pxH)} px" else "$pxW × $pxH px",
                 style = MaterialTheme.typography.labelSmall,
                 color = TextSecondary,
                 fontWeight = FontWeight.SemiBold
             )
         }
 
-        // Aspect ratio chip presets
-        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            listOf("Free", "1:1", "4:3", "16:9").forEach { mode ->
-                val isSelected = selectedAspect == mode
-                Box(
-                    modifier = Modifier
-                        .border(
-                            1.dp,
-                            if (isSelected) BorderActive else BorderSubtle,
-                            RoundedCornerShape(6.dp)
+        // Preset aspect ratios only for non-circle manual crop
+        if (!isCircleMode) {
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                listOf("Free", "1:1", "4:3", "16:9").forEach { mode ->
+                    val isSelected = selectedAspect == mode
+                    Box(
+                        modifier = Modifier
+                            .border(
+                                1.dp,
+                                if (isSelected) BorderActive else BorderSubtle,
+                                RoundedCornerShape(6.dp)
+                            )
+                            .background(if (isSelected) SurfaceRaised else Color.Transparent, RoundedCornerShape(6.dp))
+                            .clip(RoundedCornerShape(6.dp))
+                            .clickable { applyAspectRatio(mode) }
+                            .padding(horizontal = 10.dp, vertical = 4.dp)
+                    ) {
+                        Text(
+                            text = mode,
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                            color = if (isSelected) TextPrimary else TextSecondary,
+                            fontSize = 11.sp
                         )
-                        .background(if (isSelected) SurfaceRaised else Color.Transparent, RoundedCornerShape(6.dp))
-                        .clip(RoundedCornerShape(6.dp))
-                        .clickable { applyAspectRatio(mode) }
-                        .padding(horizontal = 10.dp, vertical = 4.dp)
-                ) {
-                    Text(
-                        text = mode,
-                        style = MaterialTheme.typography.labelSmall,
-                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                        color = if (isSelected) TextPrimary else TextSecondary,
-                        fontSize = 11.sp
-                    )
+                    }
                 }
             }
         }
@@ -216,7 +246,7 @@ fun InteractiveImageCropper(
             Canvas(
                 modifier = Modifier
                     .fillMaxSize()
-                    .pointerInput(containerWidth, containerHeight) {
+                    .pointerInput(containerWidth, containerHeight, isCircleMode) {
                         detectDragGestures(
                             onDragStart = { offset ->
                                 val w = size.width.toFloat()
@@ -227,7 +257,7 @@ fun InteractiveImageCropper(
                                 val rectRightPx = normRight * w
                                 val rectBottomPx = normBottom * h
 
-                                val threshold = 40f // 40px touch radius for corners
+                                val threshold = 40f
 
                                 val distTL = (offset - Offset(rectLeftPx, rectTopPx)).getDistance()
                                 val distTR = (offset - Offset(rectRightPx, rectTopPx)).getDistance()
@@ -254,34 +284,70 @@ fun InteractiveImageCropper(
 
                                 val minSize = 0.08f
 
-                                when (activeHandle) {
-                                    DragHandle.MOVE -> {
-                                        val boxW = normRight - normLeft
-                                        val boxH = normBottom - normTop
-                                        val nextL = (normLeft + dNormX).coerceIn(0f, 1f - boxW)
-                                        val nextT = (normTop + dNormY).coerceIn(0f, 1f - boxH)
-                                        normLeft = nextL
-                                        normRight = nextL + boxW
-                                        normTop = nextT
-                                        normBottom = nextT + boxH
+                                if (isCircleMode) {
+                                    when (activeHandle) {
+                                        DragHandle.MOVE -> {
+                                            val boxW = normRight - normLeft
+                                            val boxH = normBottom - normTop
+                                            val nextL = (normLeft + dNormX).coerceIn(0f, 1f - boxW)
+                                            val nextT = (normTop + dNormY).coerceIn(0f, 1f - boxH)
+                                            normLeft = nextL
+                                            normRight = nextL + boxW
+                                            normTop = nextT
+                                            normBottom = nextT + boxH
+                                        }
+                                        DragHandle.BOTTOM_RIGHT -> {
+                                            val delta = if (abs(dNormX) > abs(dNormY)) dNormX else dNormY
+                                            normRight = (normRight + delta).coerceIn(normLeft + minSize, 1f)
+                                            normBottom = (normBottom + delta).coerceIn(normTop + minSize, 1f)
+                                        }
+                                        DragHandle.TOP_LEFT -> {
+                                            val delta = if (abs(dNormX) > abs(dNormY)) dNormX else dNormY
+                                            normLeft = (normLeft + delta).coerceIn(0f, normRight - minSize)
+                                            normTop = (normTop + delta).coerceIn(0f, normBottom - minSize)
+                                        }
+                                        DragHandle.TOP_RIGHT -> {
+                                            val delta = if (abs(dNormX) > abs(dNormY)) dNormX else -dNormY
+                                            normRight = (normRight + delta).coerceIn(normLeft + minSize, 1f)
+                                            normTop = (normTop - delta).coerceIn(0f, normBottom - minSize)
+                                        }
+                                        DragHandle.BOTTOM_LEFT -> {
+                                            val delta = if (abs(dNormX) > abs(dNormY)) -dNormX else dNormY
+                                            normLeft = (normLeft - delta).coerceIn(0f, normRight - minSize)
+                                            normBottom = (normBottom + delta).coerceIn(normTop + minSize, 1f)
+                                        }
+                                        DragHandle.NONE -> {}
                                     }
-                                    DragHandle.TOP_LEFT -> {
-                                        normLeft = (normLeft + dNormX).coerceIn(0f, normRight - minSize)
-                                        normTop = (normTop + dNormY).coerceIn(0f, normBottom - minSize)
+                                } else {
+                                    when (activeHandle) {
+                                        DragHandle.MOVE -> {
+                                            val boxW = normRight - normLeft
+                                            val boxH = normBottom - normTop
+                                            val nextL = (normLeft + dNormX).coerceIn(0f, 1f - boxW)
+                                            val nextT = (normTop + dNormY).coerceIn(0f, 1f - boxH)
+                                            normLeft = nextL
+                                            normRight = nextL + boxW
+                                            normTop = nextT
+                                            normBottom = nextT + boxH
+                                        }
+                                        DragHandle.TOP_LEFT -> {
+                                            normLeft = (normLeft + dNormX).coerceIn(0f, normRight - minSize)
+                                            normTop = (normTop + dNormY).coerceIn(0f, normBottom - minSize)
+                                        }
+                                        DragHandle.TOP_RIGHT -> {
+                                            normRight = (normRight + dNormX).coerceIn(normLeft + minSize, 1f)
+                                            normTop = (normTop + dNormY).coerceIn(0f, normBottom - minSize)
+                                        }
+                                        DragHandle.BOTTOM_LEFT -> {
+                                            normLeft = (normLeft + dNormX).coerceIn(0f, normRight - minSize)
+                                            normBottom = (normBottom + dNormY).coerceIn(normTop + minSize, 1f)
+                                        }
+                                        DragHandle.BOTTOM_RIGHT -> {
+                                            normRight = (normRight + dNormX).coerceIn(normLeft + minSize, 1f)
+                                            normBottom = (normBottom + dNormY).coerceIn(normTop + minSize, 1f)
+                                        }
+                                        DragHandle.NONE -> {}
                                     }
-                                    DragHandle.TOP_RIGHT -> {
-                                        normRight = (normRight + dNormX).coerceIn(normLeft + minSize, 1f)
-                                        normTop = (normTop + dNormY).coerceIn(0f, normBottom - minSize)
-                                    }
-                                    DragHandle.BOTTOM_LEFT -> {
-                                        normLeft = (normLeft + dNormX).coerceIn(0f, normRight - minSize)
-                                        normBottom = (normBottom + dNormY).coerceIn(normTop + minSize, 1f)
-                                    }
-                                    DragHandle.BOTTOM_RIGHT -> {
-                                        normRight = (normRight + dNormX).coerceIn(normLeft + minSize, 1f)
-                                        normBottom = (normBottom + dNormY).coerceIn(normTop + minSize, 1f)
-                                    }
-                                    DragHandle.NONE -> {}
                                 }
                             }
                         )
@@ -297,55 +363,94 @@ fun InteractiveImageCropper(
                 val rectWPx = rectRightPx - rectLeftPx
                 val rectHPx = rectBottomPx - rectTopPx
 
-                // 1. Dim scrim outside crop box
-                // Top
-                drawRect(color = Color(0x99000000), topLeft = Offset(0f, 0f), size = Size(w, rectTopPx))
-                // Bottom
-                drawRect(color = Color(0x99000000), topLeft = Offset(0f, rectBottomPx), size = Size(w, h - rectBottomPx))
-                // Left
-                drawRect(color = Color(0x99000000), topLeft = Offset(0f, rectTopPx), size = Size(rectLeftPx, rectHPx))
-                // Right
-                drawRect(color = Color(0x99000000), topLeft = Offset(rectRightPx, rectTopPx), size = Size(w - rectRightPx, rectHPx))
+                if (isCircleMode) {
+                    val cx = (rectLeftPx + rectRightPx) / 2f
+                    val cy = (rectTopPx + rectBottomPx) / 2f
+                    val radius = minOf(rectWPx, rectHPx) / 2f
 
-                // 2. White crop rectangle border
-                drawRect(
-                    color = Color.White,
-                    topLeft = Offset(rectLeftPx, rectTopPx),
-                    size = Size(rectWPx, rectHPx),
-                    style = Stroke(width = 2.dp.toPx())
-                )
+                    // 1. Dim scrim with circular hole cutout
+                    val holePath = Path().apply {
+                        addRect(Rect(0f, 0f, w, h))
+                        addOval(Rect(center = Offset(cx, cy), radius = radius))
+                        fillType = PathFillType.EvenOdd
+                    }
+                    drawPath(holePath, color = Color(0xB3000000))
 
-                // 3. Subtle Rule of Thirds grid
-                val oneThirdW = rectWPx / 3f
-                val oneThirdH = rectHPx / 3f
-                val gridColor = Color(0x66FFFFFF)
-                val gridStroke = Stroke(width = 1.dp.toPx())
+                    // 2. Crisp circular outline
+                    drawCircle(
+                        color = Color.White,
+                        center = Offset(cx, cy),
+                        radius = radius,
+                        style = Stroke(width = 2.dp.toPx())
+                    )
 
-                drawLine(gridColor, Offset(rectLeftPx + oneThirdW, rectTopPx), Offset(rectLeftPx + oneThirdW, rectBottomPx), strokeWidth = gridStroke.width)
-                drawLine(gridColor, Offset(rectLeftPx + oneThirdW * 2, rectTopPx), Offset(rectLeftPx + oneThirdW * 2, rectBottomPx), strokeWidth = gridStroke.width)
-                drawLine(gridColor, Offset(rectLeftPx, rectTopPx + oneThirdH), Offset(rectRightPx, rectTopPx + oneThirdH), strokeWidth = gridStroke.width)
-                drawLine(gridColor, Offset(rectLeftPx, rectTopPx + oneThirdH * 2), Offset(rectRightPx, rectTopPx + oneThirdH * 2), strokeWidth = gridStroke.width)
+                    // 3. Delicate crosshair for precision centering
+                    val ch = 10.dp.toPx()
+                    drawLine(Color(0x80FFFFFF), Offset(cx - ch, cy), Offset(cx + ch, cy), strokeWidth = 1.dp.toPx())
+                    drawLine(Color(0x80FFFFFF), Offset(cx, cy - ch), Offset(cx, cy + ch), strokeWidth = 1.dp.toPx())
 
-                // 4. White Corner grab handles
-                val handleLen = 18.dp.toPx()
-                val handleThickness = 3.5.dp.toPx()
-                val handleColor = Color.White
+                    // 4. Subtle corner ticks indicating bounding diameter
+                    val handleLen = 14.dp.toPx()
+                    val handleThickness = 3.dp.toPx()
+                    val sqL = cx - radius
+                    val sqR = cx + radius
+                    val sqT = cy - radius
+                    val sqB = cy + radius
 
-                // Top-Left corner
-                drawLine(handleColor, Offset(rectLeftPx - 2, rectTopPx), Offset(rectLeftPx + handleLen, rectTopPx), strokeWidth = handleThickness)
-                drawLine(handleColor, Offset(rectLeftPx, rectTopPx - 2), Offset(rectLeftPx, rectTopPx + handleLen), strokeWidth = handleThickness)
+                    drawLine(Color.White, Offset(sqL - 2, sqT), Offset(sqL + handleLen, sqT), strokeWidth = handleThickness)
+                    drawLine(Color.White, Offset(sqL, sqT - 2), Offset(sqL, sqT + handleLen), strokeWidth = handleThickness)
 
-                // Top-Right corner
-                drawLine(handleColor, Offset(rectRightPx + 2, rectTopPx), Offset(rectRightPx - handleLen, rectTopPx), strokeWidth = handleThickness)
-                drawLine(handleColor, Offset(rectRightPx, rectTopPx - 2), Offset(rectRightPx, rectTopPx + handleLen), strokeWidth = handleThickness)
+                    drawLine(Color.White, Offset(sqR + 2, sqT), Offset(sqR - handleLen, sqT), strokeWidth = handleThickness)
+                    drawLine(Color.White, Offset(sqR, sqT - 2), Offset(sqR, sqT + handleLen), strokeWidth = handleThickness)
 
-                // Bottom-Left corner
-                drawLine(handleColor, Offset(rectLeftPx - 2, rectBottomPx), Offset(rectLeftPx + handleLen, rectBottomPx), strokeWidth = handleThickness)
-                drawLine(handleColor, Offset(rectLeftPx, rectBottomPx + 2), Offset(rectLeftPx, rectBottomPx - handleLen), strokeWidth = handleThickness)
+                    drawLine(Color.White, Offset(sqL - 2, sqB), Offset(sqL + handleLen, sqB), strokeWidth = handleThickness)
+                    drawLine(Color.White, Offset(sqL, sqB + 2), Offset(sqL, sqB - handleLen), strokeWidth = handleThickness)
 
-                // Bottom-Right corner
-                drawLine(handleColor, Offset(rectRightPx + 2, rectBottomPx), Offset(rectRightPx - handleLen, rectBottomPx), strokeWidth = handleThickness)
-                drawLine(handleColor, Offset(rectRightPx, rectBottomPx + 2), Offset(rectRightPx, rectBottomPx - handleLen), strokeWidth = handleThickness)
+                    drawLine(Color.White, Offset(sqR + 2, sqB), Offset(sqR - handleLen, sqB), strokeWidth = handleThickness)
+                    drawLine(Color.White, Offset(sqR, sqB + 2), Offset(sqR, sqB - handleLen), strokeWidth = handleThickness)
+                } else {
+                    // 1. Dim scrim outside crop box
+                    drawRect(color = Color(0x99000000), topLeft = Offset(0f, 0f), size = Size(w, rectTopPx))
+                    drawRect(color = Color(0x99000000), topLeft = Offset(0f, rectBottomPx), size = Size(w, h - rectBottomPx))
+                    drawRect(color = Color(0x99000000), topLeft = Offset(0f, rectTopPx), size = Size(rectLeftPx, rectHPx))
+                    drawRect(color = Color(0x99000000), topLeft = Offset(rectRightPx, rectTopPx), size = Size(w - rectRightPx, rectHPx))
+
+                    // 2. White crop rectangle border
+                    drawRect(
+                        color = Color.White,
+                        topLeft = Offset(rectLeftPx, rectTopPx),
+                        size = Size(rectWPx, rectHPx),
+                        style = Stroke(width = 2.dp.toPx())
+                    )
+
+                    // 3. Subtle Rule of Thirds grid
+                    val oneThirdW = rectWPx / 3f
+                    val oneThirdH = rectHPx / 3f
+                    val gridColor = Color(0x66FFFFFF)
+                    val gridStroke = Stroke(width = 1.dp.toPx())
+
+                    drawLine(gridColor, Offset(rectLeftPx + oneThirdW, rectTopPx), Offset(rectLeftPx + oneThirdW, rectBottomPx), strokeWidth = gridStroke.width)
+                    drawLine(gridColor, Offset(rectLeftPx + oneThirdW * 2, rectTopPx), Offset(rectLeftPx + oneThirdW * 2, rectBottomPx), strokeWidth = gridStroke.width)
+                    drawLine(gridColor, Offset(rectLeftPx, rectTopPx + oneThirdH), Offset(rectRightPx, rectTopPx + oneThirdH), strokeWidth = gridStroke.width)
+                    drawLine(gridColor, Offset(rectLeftPx, rectTopPx + oneThirdH * 2), Offset(rectRightPx, rectTopPx + oneThirdH * 2), strokeWidth = gridStroke.width)
+
+                    // 4. White Corner grab handles
+                    val handleLen = 18.dp.toPx()
+                    val handleThickness = 3.5.dp.toPx()
+                    val handleColor = Color.White
+
+                    drawLine(handleColor, Offset(rectLeftPx - 2, rectTopPx), Offset(rectLeftPx + handleLen, rectTopPx), strokeWidth = handleThickness)
+                    drawLine(handleColor, Offset(rectLeftPx, rectTopPx - 2), Offset(rectLeftPx, rectTopPx + handleLen), strokeWidth = handleThickness)
+
+                    drawLine(handleColor, Offset(rectRightPx + 2, rectTopPx), Offset(rectRightPx - handleLen, rectTopPx), strokeWidth = handleThickness)
+                    drawLine(handleColor, Offset(rectRightPx, rectTopPx - 2), Offset(rectRightPx, rectTopPx + handleLen), strokeWidth = handleThickness)
+
+                    drawLine(handleColor, Offset(rectLeftPx - 2, rectBottomPx), Offset(rectLeftPx + handleLen, rectBottomPx), strokeWidth = handleThickness)
+                    drawLine(handleColor, Offset(rectLeftPx, rectBottomPx + 2), Offset(rectLeftPx, rectBottomPx - handleLen), strokeWidth = handleThickness)
+
+                    drawLine(handleColor, Offset(rectRightPx + 2, rectBottomPx), Offset(rectRightPx - handleLen, rectBottomPx), strokeWidth = handleThickness)
+                    drawLine(handleColor, Offset(rectRightPx, rectBottomPx + 2), Offset(rectRightPx, rectBottomPx - handleLen), strokeWidth = handleThickness)
+                }
             }
         }
     }

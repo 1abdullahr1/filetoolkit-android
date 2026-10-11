@@ -38,12 +38,13 @@ fun ImageToolScreen(
     val scope = rememberCoroutineScope()
 
     var selectedFiles by remember { mutableStateOf<List<FileInfo>>(emptyList()) }
-    var targetFormat by remember { mutableStateOf("jpeg") }
+    var targetFormat by remember { mutableStateOf(if (tool.id == "img_circle_crop") "png" else "jpeg") }
     var quality by remember { mutableStateOf(85f) }
     var widthInput by remember { mutableStateOf("1920") }
     var heightInput by remember { mutableStateOf("1080") }
     var isCropMode by remember { mutableStateOf(tool.id == "img_resize") }
     var cropCoords by remember { mutableStateOf<CropCoordinates?>(null) }
+    var circleBgOption by remember { mutableStateOf("transparent") }
     var baseRatio by remember { mutableStateOf<Float?>(null) }
     var maintainAspectRatio by remember { mutableStateOf(true) }
     var isProcessing by remember { mutableStateOf(false) }
@@ -82,7 +83,9 @@ fun ImageToolScreen(
                         heightInput = info.height.toString()
                         baseRatio = info.width.toFloat() / info.height.toFloat()
                     }
-                    if (tool.id == "img_compress") {
+                    if (tool.id == "img_circle_crop") {
+                        targetFormat = "png"
+                    } else if (tool.id == "img_compress") {
                         val detected = info.format.lowercase()
                         targetFormat = when (detected) {
                             "png" -> "PNG"
@@ -167,7 +170,17 @@ fun ImageToolScreen(
 
                 // Live preview or interactive crop for primary image
                 if (selectedFiles.isNotEmpty()) {
-                    if (isCropMode && selectedFiles.size == 1) {
+                    if (tool.id == "img_circle_crop") {
+                        item {
+                            InteractiveImageCropper(
+                                imagePath = selectedFiles.first().path,
+                                onCropChange = { coords ->
+                                    cropCoords = coords
+                                },
+                                isCircleMode = true
+                            )
+                        }
+                    } else if (isCropMode && selectedFiles.size == 1) {
                         item {
                             InteractiveImageCropper(
                                 imagePath = selectedFiles.first().path,
@@ -175,7 +188,8 @@ fun ImageToolScreen(
                                     cropCoords = coords
                                     widthInput = coords.width.toString()
                                     heightInput = coords.height.toString()
-                                }
+                                },
+                                isCircleMode = false
                             )
                         }
                     } else {
@@ -349,45 +363,71 @@ fun ImageToolScreen(
                 }
             }
 
-            // Output format Section (Screenshot 3)
-            item {
-                Text(
-                    text = "Output format",
-                    style = MaterialTheme.typography.headlineMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = TextPrimary
-                )
-            }
-
-            item {
-                FormatChipSelector(
-                    options = listOf("JPEG", "PNG", "WebP", "BMP"),
-                    selectedOption = targetFormat,
-                    onOptionSelected = { targetFormat = it.lowercase() }
-                )
-            }
-
-            // Quality slider for lossy formats
-            if (targetFormat == "jpeg" || targetFormat == "webp") {
+            // Output format Section (Screenshot 3) or Utilitarian Circle Crop Options
+            if (tool.id == "img_circle_crop") {
                 item {
-                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Text("Quality", style = MaterialTheme.typography.bodySmall, color = TextSecondary)
-                            Text("${quality.toInt()}%", style = MaterialTheme.typography.bodySmall, color = TextPrimary)
+                    Text(
+                        text = "Background",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = TextSecondary
+                    )
+                    Spacer(modifier = Modifier.height(6.dp))
+                    FormatChipSelector(
+                        options = listOf("Transparent (PNG)", "White", "Black"),
+                        selectedOption = when (circleBgOption) {
+                            "white" -> "White"
+                            "black" -> "Black"
+                            else -> "Transparent (PNG)"
+                        },
+                        onOptionSelected = {
+                            circleBgOption = when (it) {
+                                "White" -> "white"
+                                "Black" -> "black"
+                                else -> "transparent"
+                            }
                         }
-                        Slider(
-                            value = quality,
-                            onValueChange = { quality = it },
-                            valueRange = 10f..100f,
-                            colors = SliderDefaults.colors(
-                                thumbColor = TextPrimary,
-                                activeTrackColor = TextPrimary,
-                                inactiveTrackColor = BorderSubtle
+                    )
+                }
+            } else {
+                item {
+                    Text(
+                        text = "Output format",
+                        style = MaterialTheme.typography.headlineMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = TextPrimary
+                    )
+                }
+
+                item {
+                    FormatChipSelector(
+                        options = listOf("JPEG", "PNG", "WebP", "BMP"),
+                        selectedOption = targetFormat,
+                        onOptionSelected = { targetFormat = it.lowercase() }
+                    )
+                }
+
+                // Quality slider for lossy formats
+                if (targetFormat == "jpeg" || targetFormat == "webp") {
+                    item {
+                        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text("Quality", style = MaterialTheme.typography.bodySmall, color = TextSecondary)
+                                Text("${quality.toInt()}%", style = MaterialTheme.typography.bodySmall, color = TextPrimary)
+                            }
+                            Slider(
+                                value = quality,
+                                onValueChange = { quality = it },
+                                valueRange = 10f..100f,
+                                colors = SliderDefaults.colors(
+                                    thumbColor = TextPrimary,
+                                    activeTrackColor = TextPrimary,
+                                    inactiveTrackColor = BorderSubtle
+                                )
                             )
-                        )
+                        }
                     }
                 }
             }
@@ -395,11 +435,12 @@ fun ImageToolScreen(
             // Live estimated file size indicator
             val firstFileSize = selectedFiles.firstOrNull()?.sizeBytes ?: 0L
             if (firstFileSize > 0L) {
-                val factor = when (targetFormat.lowercase()) {
-                    "jpeg", "jpg" -> 0.75f * (quality / 100f)
-                    "webp" -> 0.60f * (quality / 100f)
-                    "png" -> 1.10f
-                    "bmp" -> 2.50f
+                val factor = when {
+                    tool.id == "img_circle_crop" -> 0.80f
+                    targetFormat.lowercase() in listOf("jpeg", "jpg") -> 0.75f * (quality / 100f)
+                    targetFormat.lowercase() == "webp" -> 0.60f * (quality / 100f)
+                    targetFormat.lowercase() == "png" -> 1.10f
+                    targetFormat.lowercase() == "bmp" -> 2.50f
                     else -> 1.0f
                 }
                 val estBytes = (firstFileSize * factor).toLong().coerceAtLeast(1024L)
@@ -473,20 +514,30 @@ fun ImageToolScreen(
                                         onResult(primaryResult, tool.title)
                                     }
                                 } else {
+                                    val isCircleCropTool = tool.id == "img_circle_crop"
                                     val single = selectedFiles.first()
-                                    val outFile = File(context.cacheDir, "conv_${System.currentTimeMillis()}.$targetFormat")
+                                    val outExt = if (isCircleCropTool) "png" else targetFormat.lowercase()
+                                    val outFile = File(context.cacheDir, "conv_${System.currentTimeMillis()}.$outExt")
                                     val req = ImageConvertRequest(
                                         inputPath = single.path,
                                         outputPath = outFile.absolutePath,
-                                        targetFormat = targetFormat,
-                                        quality = quality.toInt(),
-                                        width = if (isCropMode) null else widthInput.toIntOrNull(),
-                                        height = if (isCropMode) null else heightInput.toIntOrNull(),
-                                        cropX = if (isCropMode) cropCoords?.x else null,
-                                        cropY = if (isCropMode) cropCoords?.y else null,
-                                        cropWidth = if (isCropMode) cropCoords?.width else null,
-                                        cropHeight = if (isCropMode) cropCoords?.height else null,
-                                        keepAspectRatio = maintainAspectRatio
+                                        targetFormat = if (isCircleCropTool) "png" else targetFormat,
+                                        quality = if (isCircleCropTool) null else quality.toInt(),
+                                        width = if (isCircleCropTool || isCropMode) null else widthInput.toIntOrNull(),
+                                        height = if (isCircleCropTool || isCropMode) null else heightInput.toIntOrNull(),
+                                        cropX = if (isCircleCropTool || isCropMode) cropCoords?.x else null,
+                                        cropY = if (isCircleCropTool || isCropMode) cropCoords?.y else null,
+                                        cropWidth = if (isCircleCropTool || isCropMode) cropCoords?.width else null,
+                                        cropHeight = if (isCircleCropTool || isCropMode) cropCoords?.height else null,
+                                        keepAspectRatio = maintainAspectRatio,
+                                        bgColorHex = if (isCircleCropTool) {
+                                            when (circleBgOption) {
+                                                "white" -> "#FFFFFF"
+                                                "black" -> "#000000"
+                                                else -> null
+                                            }
+                                        } else null,
+                                        circleCrop = if (isCircleCropTool) true else null
                                     )
                                     val result = NativeBridge.convertImg(req)
                                     withContext(Dispatchers.Main) {

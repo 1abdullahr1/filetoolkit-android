@@ -30,6 +30,7 @@ pub struct ImageConvertRequest {
     pub crop_height: Option<u32>,
     pub strip_metadata: Option<bool>,
     pub bg_color_hex: Option<String>, // e.g. "#FFFFFF" for transparency flattening
+    pub circle_crop: Option<bool>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
