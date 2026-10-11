@@ -4,6 +4,7 @@ import androidx.compose.ui.graphics.Color
 
 // Visual Design System from d.md & screenshots
 val PureBlack = Color(0xFF000000)
+val PureWhite = Color(0xFFFFFFFF)
 val DarkBackground = Color(0xFF0D0D0D)
 val SurfaceCharcoal = Color(0xFF1E1E1E)
 val SurfaceRaised = Color(0xFF2C2C2C)
