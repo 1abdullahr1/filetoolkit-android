@@ -52,6 +52,7 @@ fn test_image_conversion_and_resize() {
         crop_height: None,
         strip_metadata: Some(true),
         bg_color_hex: Some("#FFFFFF".to_string()),
+        circle_crop: None,
     };
 
     let res_jpg = convert_image(&req_jpg).expect("convert to jpeg");
@@ -80,6 +81,7 @@ fn test_image_conversion_and_resize() {
         crop_height: None,
         strip_metadata: None,
         bg_color_hex: None,
+        circle_crop: None,
     };
     let res_webp = convert_image(&req_webp).expect("convert to webp");
     assert!(res_webp.success);
@@ -101,6 +103,7 @@ fn test_image_conversion_and_resize() {
         crop_height: None,
         strip_metadata: None,
         bg_color_hex: None,
+        circle_crop: None,
     };
     let res_bmp = convert_image(&req_bmp).expect("convert to bmp");
     assert!(res_bmp.success);
@@ -135,6 +138,7 @@ fn test_batch_image_processing() {
                 crop_height: None,
                 strip_metadata: None,
                 bg_color_hex: None,
+                circle_crop: None,
             },
             ImageConvertRequest {
                 input_path: src2,
@@ -151,6 +155,7 @@ fn test_batch_image_processing() {
                 crop_height: None,
                 strip_metadata: None,
                 bg_color_hex: None,
+                circle_crop: None,
             },
         ],
     };
@@ -297,3 +302,35 @@ fn test_pdf_tools_workflow() {
     let pn_res = add_page_numbers(&pn_req).expect("add page numbers");
     assert!(pn_res.success);
 }
+
+#[test]
+fn test_circle_crop_integration() {
+    let dir = tempfile::tempdir().unwrap();
+    let src = dir.path().join("circle_in.png").to_string_lossy().to_string();
+    let out = dir.path().join("circle_out.png").to_string_lossy().to_string();
+
+    create_test_image(&src, 120, 120);
+
+    let req = ImageConvertRequest {
+        input_path: src,
+        output_path: out.clone(),
+        target_format: "png".to_string(),
+        quality: None,
+        width: None,
+        height: None,
+        keep_aspect_ratio: None,
+        rotation_degrees: None,
+        crop_x: None,
+        crop_y: None,
+        crop_width: None,
+        crop_height: None,
+        strip_metadata: None,
+        bg_color_hex: None,
+        circle_crop: Some(true),
+    };
+
+    let res = convert_image(&req).expect("circle crop image");
+    assert!(res.success);
+    assert!(std::path::Path::new(&out).exists());
+}
+
