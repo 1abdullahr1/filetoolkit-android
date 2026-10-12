@@ -27,17 +27,24 @@ fun ToolsScreen(
 ) {
     var searchQuery by remember { mutableStateOf("") }
 
+    val isSearching = searchQuery.isNotBlank()
     val filteredTools = remember(searchQuery) {
-        if (searchQuery.isNotBlank()) {
+        if (isSearching) {
             ToolRepository.searchTools(searchQuery)
         } else {
             ToolRepository.allTools
         }
     }
 
-    val imageTools = remember(filteredTools) { filteredTools.filter { it.category == ToolCategory.IMAGES } }
-    val pdfTools = remember(filteredTools) { filteredTools.filter { it.category == ToolCategory.PDF } }
-    val textTools = remember(filteredTools) { filteredTools.filter { it.category == ToolCategory.TEXT } }
+    val imageTools = remember(filteredTools, isSearching) {
+        if (!isSearching) ToolRepository.imageTools else filteredTools.filter { it.category == ToolCategory.IMAGES }
+    }
+    val pdfTools = remember(filteredTools, isSearching) {
+        if (!isSearching) ToolRepository.pdfTools else filteredTools.filter { it.category == ToolCategory.PDF }
+    }
+    val textTools = remember(filteredTools, isSearching) {
+        if (!isSearching) ToolRepository.textTools else filteredTools.filter { it.category == ToolCategory.TEXT }
+    }
 
     Scaffold(
         containerColor = PureBlack

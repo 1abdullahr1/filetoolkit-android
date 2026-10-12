@@ -6,12 +6,16 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.animation.AnimatedContentTransitionScope
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -21,6 +25,8 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -45,7 +51,6 @@ class MainActivity : ComponentActivity() {
         setContent {
             FileToolkitTheme {
                 val navController = rememberNavController()
-                val historyList by historyRepository.history.collectAsState()
                 val gson = remember { Gson() }
 
                 var currentToolId by rememberSaveable { mutableStateOf<String?>(null) }
@@ -98,10 +103,10 @@ class MainActivity : ComponentActivity() {
                         navController = navController,
                         startDestination = "home",
                         modifier = Modifier.padding(innerPadding),
-                        enterTransition = { fadeIn(animationSpec = tween(90)) },
-                        exitTransition = { fadeOut(animationSpec = tween(90)) },
-                        popEnterTransition = { fadeIn(animationSpec = tween(90)) },
-                        popExitTransition = { fadeOut(animationSpec = tween(90)) }
+                        enterTransition = { EnterTransition.None },
+                        exitTransition = { ExitTransition.None },
+                        popEnterTransition = { EnterTransition.None },
+                        popExitTransition = { ExitTransition.None }
                     ) {
                         // 1. Home Tab
                         composable("home") {
@@ -149,8 +154,7 @@ class MainActivity : ComponentActivity() {
                         // 3. Recent Tab
                         composable("recent") {
                             RecentScreen(
-                                historyItems = historyList,
-                                onClearHistory = { historyRepository.clearHistory() },
+                                historyRepository = historyRepository,
                                 onNavigateToTools = { navController.navigate("tools") }
                             )
                         }
@@ -166,10 +170,10 @@ class MainActivity : ComponentActivity() {
                         // Tool Workflows
                         composable(
                             "tool_image",
-                            enterTransition = { fadeIn(tween(180)) + slideIntoContainer(AnimatedContentTransitionScope.SlideDirection.Start, tween(180)) },
-                            exitTransition = { fadeOut(tween(180)) + slideOutOfContainer(AnimatedContentTransitionScope.SlideDirection.Start, tween(180)) },
-                            popEnterTransition = { fadeIn(tween(180)) + slideIntoContainer(AnimatedContentTransitionScope.SlideDirection.End, tween(180)) },
-                            popExitTransition = { fadeOut(tween(180)) + slideOutOfContainer(AnimatedContentTransitionScope.SlideDirection.End, tween(180)) }
+                            enterTransition = { fadeIn(tween(150, easing = FastOutSlowInEasing)) + slideIntoContainer(AnimatedContentTransitionScope.SlideDirection.Start, tween(150, easing = FastOutSlowInEasing)) },
+                            exitTransition = { fadeOut(tween(150, easing = FastOutSlowInEasing)) + slideOutOfContainer(AnimatedContentTransitionScope.SlideDirection.Start, tween(150, easing = FastOutSlowInEasing)) },
+                            popEnterTransition = { fadeIn(tween(150, easing = FastOutSlowInEasing)) + slideIntoContainer(AnimatedContentTransitionScope.SlideDirection.End, tween(150, easing = FastOutSlowInEasing)) },
+                            popExitTransition = { fadeOut(tween(150, easing = FastOutSlowInEasing)) + slideOutOfContainer(AnimatedContentTransitionScope.SlideDirection.End, tween(150, easing = FastOutSlowInEasing)) }
                         ) {
                             currentTool?.let { tool ->
                                 ImageToolScreen(
@@ -202,10 +206,10 @@ class MainActivity : ComponentActivity() {
 
                         composable(
                             "tool_pdf",
-                            enterTransition = { fadeIn(tween(180)) + slideIntoContainer(AnimatedContentTransitionScope.SlideDirection.Start, tween(180)) },
-                            exitTransition = { fadeOut(tween(180)) + slideOutOfContainer(AnimatedContentTransitionScope.SlideDirection.Start, tween(180)) },
-                            popEnterTransition = { fadeIn(tween(180)) + slideIntoContainer(AnimatedContentTransitionScope.SlideDirection.End, tween(180)) },
-                            popExitTransition = { fadeOut(tween(180)) + slideOutOfContainer(AnimatedContentTransitionScope.SlideDirection.End, tween(180)) }
+                            enterTransition = { fadeIn(tween(150, easing = FastOutSlowInEasing)) + slideIntoContainer(AnimatedContentTransitionScope.SlideDirection.Start, tween(150, easing = FastOutSlowInEasing)) },
+                            exitTransition = { fadeOut(tween(150, easing = FastOutSlowInEasing)) + slideOutOfContainer(AnimatedContentTransitionScope.SlideDirection.Start, tween(150, easing = FastOutSlowInEasing)) },
+                            popEnterTransition = { fadeIn(tween(150, easing = FastOutSlowInEasing)) + slideIntoContainer(AnimatedContentTransitionScope.SlideDirection.End, tween(150, easing = FastOutSlowInEasing)) },
+                            popExitTransition = { fadeOut(tween(150, easing = FastOutSlowInEasing)) + slideOutOfContainer(AnimatedContentTransitionScope.SlideDirection.End, tween(150, easing = FastOutSlowInEasing)) }
                         ) {
                             currentTool?.let { tool ->
                                 PdfToolScreen(
@@ -238,10 +242,10 @@ class MainActivity : ComponentActivity() {
 
                         composable(
                             "tool_text",
-                            enterTransition = { fadeIn(tween(180)) + slideIntoContainer(AnimatedContentTransitionScope.SlideDirection.Start, tween(180)) },
-                            exitTransition = { fadeOut(tween(180)) + slideOutOfContainer(AnimatedContentTransitionScope.SlideDirection.Start, tween(180)) },
-                            popEnterTransition = { fadeIn(tween(180)) + slideIntoContainer(AnimatedContentTransitionScope.SlideDirection.End, tween(180)) },
-                            popExitTransition = { fadeOut(tween(180)) + slideOutOfContainer(AnimatedContentTransitionScope.SlideDirection.End, tween(180)) }
+                            enterTransition = { fadeIn(tween(150, easing = FastOutSlowInEasing)) + slideIntoContainer(AnimatedContentTransitionScope.SlideDirection.Start, tween(150, easing = FastOutSlowInEasing)) },
+                            exitTransition = { fadeOut(tween(150, easing = FastOutSlowInEasing)) + slideOutOfContainer(AnimatedContentTransitionScope.SlideDirection.Start, tween(150, easing = FastOutSlowInEasing)) },
+                            popEnterTransition = { fadeIn(tween(150, easing = FastOutSlowInEasing)) + slideIntoContainer(AnimatedContentTransitionScope.SlideDirection.End, tween(150, easing = FastOutSlowInEasing)) },
+                            popExitTransition = { fadeOut(tween(150, easing = FastOutSlowInEasing)) + slideOutOfContainer(AnimatedContentTransitionScope.SlideDirection.End, tween(150, easing = FastOutSlowInEasing)) }
                         ) {
                             currentTool?.let { tool ->
                                 TextToolScreen(
@@ -273,10 +277,10 @@ class MainActivity : ComponentActivity() {
 
                         composable(
                             "result",
-                            enterTransition = { fadeIn(tween(180)) + slideIntoContainer(AnimatedContentTransitionScope.SlideDirection.Start, tween(180)) },
-                            exitTransition = { fadeOut(tween(180)) + slideOutOfContainer(AnimatedContentTransitionScope.SlideDirection.Start, tween(180)) },
-                            popEnterTransition = { fadeIn(tween(180)) + slideIntoContainer(AnimatedContentTransitionScope.SlideDirection.End, tween(180)) },
-                            popExitTransition = { fadeOut(tween(180)) + slideOutOfContainer(AnimatedContentTransitionScope.SlideDirection.End, tween(180)) }
+                            enterTransition = { fadeIn(tween(150, easing = FastOutSlowInEasing)) + slideIntoContainer(AnimatedContentTransitionScope.SlideDirection.Start, tween(150, easing = FastOutSlowInEasing)) },
+                            exitTransition = { fadeOut(tween(150, easing = FastOutSlowInEasing)) + slideOutOfContainer(AnimatedContentTransitionScope.SlideDirection.Start, tween(150, easing = FastOutSlowInEasing)) },
+                            popEnterTransition = { fadeIn(tween(150, easing = FastOutSlowInEasing)) + slideIntoContainer(AnimatedContentTransitionScope.SlideDirection.End, tween(150, easing = FastOutSlowInEasing)) },
+                            popExitTransition = { fadeOut(tween(150, easing = FastOutSlowInEasing)) + slideOutOfContainer(AnimatedContentTransitionScope.SlideDirection.End, tween(150, easing = FastOutSlowInEasing)) }
                         ) {
                             lastResult?.let { res ->
                                 ResultsScreen(
@@ -293,10 +297,10 @@ class MainActivity : ComponentActivity() {
 
                         composable(
                             "format_matrix",
-                            enterTransition = { fadeIn(tween(180)) + slideIntoContainer(AnimatedContentTransitionScope.SlideDirection.Start, tween(180)) },
-                            exitTransition = { fadeOut(tween(180)) + slideOutOfContainer(AnimatedContentTransitionScope.SlideDirection.Start, tween(180)) },
-                            popEnterTransition = { fadeIn(tween(180)) + slideIntoContainer(AnimatedContentTransitionScope.SlideDirection.End, tween(180)) },
-                            popExitTransition = { fadeOut(tween(180)) + slideOutOfContainer(AnimatedContentTransitionScope.SlideDirection.End, tween(180)) }
+                            enterTransition = { fadeIn(tween(150, easing = FastOutSlowInEasing)) + slideIntoContainer(AnimatedContentTransitionScope.SlideDirection.Start, tween(150, easing = FastOutSlowInEasing)) },
+                            exitTransition = { fadeOut(tween(150, easing = FastOutSlowInEasing)) + slideOutOfContainer(AnimatedContentTransitionScope.SlideDirection.Start, tween(150, easing = FastOutSlowInEasing)) },
+                            popEnterTransition = { fadeIn(tween(150, easing = FastOutSlowInEasing)) + slideIntoContainer(AnimatedContentTransitionScope.SlideDirection.End, tween(150, easing = FastOutSlowInEasing)) },
+                            popExitTransition = { fadeOut(tween(150, easing = FastOutSlowInEasing)) + slideOutOfContainer(AnimatedContentTransitionScope.SlideDirection.End, tween(150, easing = FastOutSlowInEasing)) }
                         ) {
                             FormatMatrixScreen(
                                 onNavigateBack = { navController.popBackStack() }
@@ -367,10 +371,19 @@ fun BottomNavItem(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val haptic = LocalHapticFeedback.current
+
     Box(
         modifier = modifier
             .fillMaxHeight()
-            .clickable(onClick = onClick),
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                onClick = {
+                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                    onClick()
+                }
+            ),
         contentAlignment = Alignment.Center
     ) {
         Column(

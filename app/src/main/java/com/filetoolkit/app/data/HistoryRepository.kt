@@ -187,7 +187,13 @@ object ToolRepository {
         )
     )
 
-    fun findTool(id: String): ToolDefinition? = allTools.find { it.id == id }
+    val imageTools: List<ToolDefinition> = allTools.filter { it.category == ToolCategory.IMAGES }
+    val pdfTools: List<ToolDefinition> = allTools.filter { it.category == ToolCategory.PDF }
+    val textTools: List<ToolDefinition> = allTools.filter { it.category == ToolCategory.TEXT }
+
+    private val toolMap: Map<String, ToolDefinition> = allTools.associateBy { it.id }
+
+    fun findTool(id: String): ToolDefinition? = toolMap[id]
 
     fun searchTools(query: String): List<ToolDefinition> {
         val q = query.trim().lowercase()

@@ -23,7 +23,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.FileProvider
-import com.filetoolkit.app.data.HistoryItem
+import com.filetoolkit.app.data.HistoryRepository
 import com.filetoolkit.app.ui.components.formatFileSize
 import com.filetoolkit.app.ui.theme.*
 import java.io.File
@@ -33,10 +33,10 @@ import java.util.Locale
 
 @Composable
 fun RecentScreen(
-    historyItems: List<HistoryItem>,
-    onClearHistory: () -> Unit,
+    historyRepository: HistoryRepository,
     onNavigateToTools: () -> Unit = {}
 ) {
+    val historyItems by historyRepository.history.collectAsState()
     val context = LocalContext.current
     var selectedFilter by remember { mutableStateOf("All") }
     val dateFormat = remember { SimpleDateFormat("MMM dd · HH:mm", Locale.getDefault()) }
@@ -72,7 +72,7 @@ fun RecentScreen(
                         color = TextPrimary
                     )
                     if (historyItems.isNotEmpty()) {
-                        IconButton(onClick = onClearHistory) {
+                        IconButton(onClick = { historyRepository.clearHistory() }) {
                             Icon(
                                 imageVector = Icons.Default.DeleteSweep,
                                 contentDescription = "Clear",
